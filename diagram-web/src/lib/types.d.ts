@@ -112,4 +112,14 @@ export interface EditorProps {
     readOnly: boolean;
   };
   onUpdate: (text: string) => void;
+  selectionRequest?: SourceSelectionRequest;
+}
+
+export interface SourceRange {
+  end: number;
+  start: number;
+}
+
+export interface SourceSelectionRequest extends SourceRange {
+  id: number;
 }

@@ -8,6 +8,9 @@ class FakeAwareness {
   getStates() {
     return new Map([[1, this.state]]);
   }
+  getLocalState() {
+    return this.state;
+  }
   setLocalState(value: Record<string, unknown> | null) {
     this.state = value ?? {};
   }
@@ -75,6 +78,11 @@ describe('CollaborativeDocumentController', () => {
     });
 
     await controller.start();
+    controller.setPreviewCursor({ revision: 'revision-1', x: 10, y: 20 });
+    expect(providers[0].awareness.getLocalState()).toMatchObject({
+      previewCursor: { revision: 'revision-1', x: 10, y: 20 },
+      user: { displayName: 'Ada Lovelace', name: 'Ada Lovelace', userId: 'user-1' }
+    });
     providers[0].emit('connection-close');
     reconnect?.();
     await vi.waitFor(() => expect(providers).toHaveLength(2));

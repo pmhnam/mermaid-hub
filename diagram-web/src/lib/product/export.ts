@@ -1,8 +1,11 @@
+import { render as renderMermaid } from '$lib/util/mermaid';
+import type { MermaidConfig } from 'mermaid';
+
 export type DiagramExportFormat = 'png' | 'svg' | 'pdf' | 'mmd';
 
 export type DiagramExportBackground =
   | { type: 'white' }
-  | { type: 'dark' }
+  | { type: 'black' }
   | { type: 'transparent' }
   | { color: string; type: 'custom' };
 
@@ -28,7 +31,7 @@ interface SvgDimensions {
   width: number;
 }
 
-const DARK_BACKGROUND = '#111827';
+const BLACK_BACKGROUND = '#000000';
 const MAX_RASTER_DIMENSION = 8192;
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 
@@ -39,7 +42,7 @@ const resolveBackground = (
   forceWhite = false
 ): string | null => {
   if (forceWhite || background.type === 'white') return '#ffffff';
-  if (background.type === 'dark') return DARK_BACKGROUND;
+  if (background.type === 'black') return BLACK_BACKGROUND;
   if (background.type === 'transparent') return null;
   const style = document.createElement('span').style;
   style.color = background.color;
@@ -153,6 +156,41 @@ const loadSvgImage = (svg: string): Promise<HTMLImageElement> =>
     });
     image.src = url;
   });
+
+const replaceHtmlLabelsForRaster = (svg: SVGSVGElement): void => {
+  svg.querySelectorAll('foreignObject').forEach((foreignObject) => {
+    const content = foreignObject.cloneNode(true) as SVGElement;
+    content.querySelectorAll('br').forEach((lineBreak) => lineBreak.replaceWith('\n'));
+    content.querySelectorAll('p, li').forEach((block) => block.append('\n'));
+    const lines = (content.textContent ?? '')
+      .split('\n')
+      .map((line) => line.replaceAll(/\s+/g, ' ').trim())
+      .filter(Boolean);
+    if (lines.length === 0) {
+      foreignObject.remove();
+      return;
+    }
+
+    const x = Number.parseFloat(foreignObject.getAttribute('x') ?? '0');
+    const y = Number.parseFloat(foreignObject.getAttribute('y') ?? '0');
+    const width = Number.parseFloat(foreignObject.getAttribute('width') ?? '0');
+    const height = Number.parseFloat(foreignObject.getAttribute('height') ?? '0');
+    const text = document.createElementNS(SVG_NAMESPACE, 'text');
+    const centerX = x + width / 2;
+    text.setAttribute('class', 'nodeLabel');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('x', String(centerX));
+    text.setAttribute('y', String(y + height / 2));
+    lines.forEach((line, index) => {
+      const span = document.createElementNS(SVG_NAMESPACE, 'tspan');
+      span.setAttribute('x', String(centerX));
+      span.setAttribute('dy', index === 0 ? `${-(lines.length - 1) * 0.6}em` : '1.2em');
+      span.textContent = line;
+      text.append(span);
+    });
+    foreignObject.replaceWith(text);
+  });
+};
 
 const renderSvgToCanvas = async (
   svgElement: SVGSVGElement,
@@ -273,8 +311,34 @@ export const exportDiagram = async (
   }
 
   const forceWhite = options.format === 'pdf';
+  let rasterSvg = options.svgElement;
+  if (rasterSvg.querySelector('foreignObject')) {
+    let config: MermaidConfig;
+    try {
+      config = JSON.parse(options.config) as MermaidConfig;
+    } catch {
+      throw new Error('The current Mermaid configuration is not valid JSON.');
+    }
+    const { svg } = await renderMermaid(
+      {
+        ...config,
+        flowchart: { ...config.flowchart, htmlLabels: false },
+        htmlLabels: false
+      },
+      options.code,
+      `export-${Date.now()}`
+    );
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = svg;
+    const rendered = wrapper.querySelector('svg');
+    if (!(rendered instanceof SVGSVGElement)) {
+      throw new Error('This diagram contains HTML labels that cannot be copied as an image.');
+    }
+    replaceHtmlLabelsForRaster(rendered);
+    rasterSvg = rendered;
+  }
   const canvas = await renderSvgToCanvas(
-    options.svgElement,
+    rasterSvg,
     options.background,
     options.scale ?? (forceWhite ? 3 : 2),
     forceWhite
@@ -286,7 +350,7 @@ export const exportDiagram = async (
   const jpeg = new Uint8Array(
     await (await blobFromCanvas(canvas, 'image/jpeg', 0.94)).arrayBuffer()
   );
-  const dimensions = getSvgDimensions(options.svgElement);
+  const dimensions = getSvgDimensions(rasterSvg);
   return {
     blob: createPdfFromJpeg(jpeg, canvas.width, canvas.height, dimensions.width, dimensions.height),
     filename
@@ -301,4 +365,12 @@ export const downloadDiagramExport = ({ blob, filename }: DiagramExportResult): 
   anchor.click();
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 0);
+};
+
+export const copyPngExport = async (result: Promise<DiagramExportResult>): Promise<void> => {
+  if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+    throw new Error('Copying images is not supported by this browser.');
+  }
+  const blob = result.then((exported) => exported.blob);
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
 };

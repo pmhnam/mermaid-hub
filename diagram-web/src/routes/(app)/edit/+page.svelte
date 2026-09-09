@@ -20,7 +20,7 @@
   import { Toggle } from '$/components/ui/toggle';
   import VersionSecurityToolbar from '$/components/VersionSecurityToolbar.svelte';
   import View from '$/components/View.svelte';
-  import type { EditorMode, Tab } from '$/types';
+  import type { EditorMode, SourceRange, SourceSelectionRequest, Tab } from '$/types';
   import { shouldShowEditorChooser } from '$/util/migration/domainMigration';
   import { PanZoomState } from '$/util/panZoom';
   import { validatedState, updateCodeStore, urls } from '$/util/state.svelte';
@@ -55,6 +55,14 @@
   let isMobile = $derived(width < 640);
   let isViewMode = $state(true);
   let showEditorChooser = $state(false);
+  let selectionRequest = $state<SourceSelectionRequest | undefined>();
+  let selectionId = 0;
+
+  const selectSource = (range: SourceRange): void => {
+    isViewMode = false;
+    updateCodeStore({ editorMode: 'code' });
+    selectionRequest = { ...range, id: ++selectionId };
+  };
 
   onMount(async () => {
     showEditorChooser = shouldShowEditorChooser();
@@ -129,7 +137,7 @@
               {#snippet actions()}
                 <DiagramDocButton />
               {/snippet}
-              <Editor {isMobile} />
+              <Editor {isMobile} {selectionRequest} />
             </Card>
 
             <div class="group flex flex-wrap justify-between gap-4 sm:gap-6">
@@ -140,7 +148,10 @@
         </Resizable.Pane>
         <Resizable.Handle class="mr-1 hidden opacity-0 sm:block" />
         <Resizable.Pane minSize={15} class="relative flex h-full flex-1 flex-col overflow-hidden">
-          <View {panZoomState} shouldShowGrid={validatedState.current.grid} />
+          <View
+            onSourceSelect={selectSource}
+            {panZoomState}
+            shouldShowGrid={validatedState.current.grid} />
           <div class="absolute top-0 left-5 hidden md:block"><EnhancedEditsButton /></div>
           <div class="absolute top-0 right-0">
             <PanZoomToolbar {panZoomState} fullScreenHref={urls.current.view} />

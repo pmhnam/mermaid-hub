@@ -5,7 +5,7 @@
   import { markdown } from '@codemirror/lang-markdown';
   import { yamlFrontmatter } from '@codemirror/lang-yaml';
   import { language } from '@codemirror/language';
-  import { Compartment, EditorState } from '@codemirror/state';
+  import { Compartment, EditorSelection, EditorState } from '@codemirror/state';
   import { EditorView } from '@codemirror/view';
   import { vsCodeDark } from '@fsegurai/codemirror-theme-vscode-dark';
   import { vsCodeLight } from '@fsegurai/codemirror-theme-vscode-light';
@@ -15,6 +15,8 @@
   import { yCollab } from 'y-codemirror.next';
 
   let editorView: EditorView | undefined;
+  let editorReady = $state(false);
+  let handledSelectionId = -1;
   let editorContainer: HTMLDivElement;
   // Deliberately not $state: the sync effect below both reads and writes it,
   // so a reactive currentText would make every keystroke re-run the effect
@@ -25,7 +27,7 @@
   const collaborationCompartment = new Compartment();
   const readOnlyCompartment = new Compartment();
 
-  const { onUpdate, collaboration }: EditorProps = $props();
+  const { onUpdate, collaboration, selectionRequest }: EditorProps = $props();
 
   $effect(() => {
     editorView?.dispatch({
@@ -71,6 +73,7 @@
       }),
       parent: editorContainer
     });
+    editorReady = true;
 
     return () => {
       editorView?.destroy();
@@ -80,7 +83,7 @@
   $effect(() => {
     const { editorMode, code, mermaid } = validatedState.current;
     const text = editorMode === 'code' ? code : mermaid;
-    if (!editorView) {
+    if (!editorReady || !editorView) {
       return;
     }
     if (!collaboration) {
@@ -118,6 +121,27 @@
         ])
       ]
     });
+  });
+
+  $effect(() => {
+    const request = selectionRequest;
+    if (
+      !request ||
+      request.id === handledSelectionId ||
+      validatedState.current.editorMode !== 'code' ||
+      !editorReady ||
+      !editorView
+    ) {
+      return;
+    }
+    const end = Math.min(request.end, editorView.state.doc.length);
+    const start = Math.min(request.start, end);
+    editorView.dispatch({
+      effects: EditorView.scrollIntoView(EditorSelection.range(start, end), { y: 'center' }),
+      selection: { anchor: start, head: end }
+    });
+    editorView.focus();
+    handledSelectionId = request.id;
   });
 </script>
 

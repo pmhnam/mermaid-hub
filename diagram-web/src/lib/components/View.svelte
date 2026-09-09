@@ -1,10 +1,12 @@
 <script lang="ts">
   import type { State, ValidatedState } from '$/types';
+  import type { SourceRange } from '$lib/types';
   import { recordRenderTime, shouldRefreshView } from '$/util/autoSync';
   import { PanZoomState } from '$/util/panZoom';
   import { renderAndPlaceDiagram } from '$/util/renderView';
   import { updateCodeStore, validatedState } from '$/util/state.svelte';
   import { saveStatistics } from '$/util/stats';
+  import { sourceRangeForSvgTarget } from '$lib/util/sourceNavigation';
   import FontAwesome, { mayContainFontAwesome } from '$lib/components/FontAwesome.svelte';
   import uniqueID from 'lodash-es/uniqueId';
   import type { MermaidConfig } from 'mermaid';
@@ -12,9 +14,14 @@
   import { onMount } from 'svelte';
 
   let {
+    onSourceSelect,
     panZoomState = new PanZoomState(),
     shouldShowGrid = true
-  }: { panZoomState?: PanZoomState; shouldShowGrid?: boolean } = $props();
+  }: {
+    onSourceSelect?: (range: SourceRange) => void;
+    panZoomState?: PanZoomState;
+    shouldShowGrid?: boolean;
+  } = $props();
   let code = '';
   let config = '';
   let container: HTMLDivElement | undefined = $state();
@@ -23,6 +30,7 @@
   let error = $state(false);
   let panZoom = true;
   let manualUpdate = true;
+  let renderedDiagramType = '';
   let waitForFontAwesomeToLoad: FontAwesome['waitForFontAwesomeToLoad'] | undefined = $state();
 
   // Set up panZoom state observer to update the store when pan/zoom changes
@@ -83,6 +91,7 @@
           viewId: uniqueID('graph-')
         });
         diagramType = detectedDiagramType;
+        renderedDiagramType = detectedDiagramType ?? '';
         if (graphDiv && state.panZoom) {
           handlePanZoom(state, graphDiv);
         }
@@ -115,6 +124,14 @@
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     pendingStateChange = pendingStateChange.then(() => handleStateChange(state).catch(() => {}));
   });
+
+  const handleDoubleClick = (event: MouseEvent): void => {
+    if (!onSourceSelect || rough || !(event.target instanceof Element)) return;
+    const range = sourceRangeForSvgTarget(code, renderedDiagramType, event.target);
+    if (!range) return;
+    event.preventDefault();
+    onSourceSelect(range);
+  };
 </script>
 
 <FontAwesome bind:waitForFontAwesomeToLoad />
@@ -122,6 +139,9 @@
 <div
   id="view"
   bind:this={view}
+  role="application"
+  aria-label="Interactive diagram preview"
+  ondblclick={handleDoubleClick}
   class={['h-full w-full', shouldShowGrid && `grid-bg-${mode.current}`, error && 'opacity-50']}>
   <div id="container" bind:this={container} class="h-full overflow-auto"></div>
 </div>

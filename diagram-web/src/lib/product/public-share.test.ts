@@ -17,11 +17,14 @@ describe('public sharing helpers', () => {
       }
     };
 
-    const first = publicGuestIdentity(session, () => 'abcd-1234');
-    const second = publicGuestIdentity(session, () => 'unused');
+    const first = publicGuestIdentity(session, 'diagram-1', () => 'abcd-1234');
+    const second = publicGuestIdentity(session, 'diagram-1', () => 'unused');
+    const otherDiagram = publicGuestIdentity(session, 'diagram-2', () => 'efgh-5678');
 
-    expect(first).toEqual({ displayName: 'Guest ABCD', id: 'guest:abcd-1234' });
+    expect(first.displayName).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
+    expect(first.id).toBe('guest:abcd-1234');
     expect(second).toEqual(first);
+    expect(otherDiagram.id).toBe('guest:efgh-5678');
   });
 
   it('only accepts backend public modes', () => {

@@ -3,6 +3,7 @@
   import * as Dialog from '$lib/components/ui/dialog';
   import { Input } from '$lib/components/ui/input';
   import {
+    copyPngExport,
     downloadDiagramExport,
     exportDiagram,
     serializeDiagramSvg,
@@ -10,6 +11,7 @@
     type DiagramExportFormat
   } from '$lib/product/export';
   import DownloadIcon from '~icons/material-symbols/download';
+  import CopyIcon from '~icons/material-symbols/content-copy-outline-rounded';
 
   interface Props {
     code: string;
@@ -24,8 +26,10 @@
   let format = $state<DiagramExportFormat>('png');
   let backgroundType = $state<DiagramExportBackground['type']>('white');
   let customColor = $state('#f4efe6');
-  let loading = $state(false);
+  let action = $state<'copy' | 'download' | null>(null);
   let error = $state('');
+  let copied = $state(false);
+  let currentSvgElement = $state<SVGSVGElement | null>(null);
 
   const background = $derived<DiagramExportBackground>(
     backgroundType === 'custom' ? { color: customColor, type: 'custom' } : { type: backgroundType }
@@ -34,41 +38,73 @@
     format === 'pdf' ? { type: 'white' } : background
   );
   const previewSource = $derived(
-    svgElement
+    currentSvgElement
       ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-          serializeDiagramSvg(svgElement, effectiveBackground)
+          serializeDiagramSvg(currentSvgElement, effectiveBackground)
         )}`
       : ''
   );
 
+  $effect(() => {
+    if (!open) return;
+    const refreshSvg = () => {
+      const latest = getSvgElement?.() ?? svgElement;
+      if (latest !== currentSvgElement) currentSvgElement = latest;
+    };
+    refreshSvg();
+    const timer = setInterval(refreshSvg, 250);
+    return () => clearInterval(timer);
+  });
+
+  const createExport = async (requestedFormat: DiagramExportFormat) => {
+    const latestSvgElement = getSvgElement?.() ?? currentSvgElement ?? svgElement;
+    if (!latestSvgElement && requestedFormat !== 'mmd') {
+      throw new Error('The diagram preview is not ready to export.');
+    }
+    currentSvgElement = latestSvgElement;
+    return exportDiagram({
+      background,
+      code,
+      config,
+      format: requestedFormat,
+      svgElement: latestSvgElement as SVGSVGElement,
+      title
+    });
+  };
+
   const download = async (): Promise<void> => {
     error = '';
-    const currentSvgElement = getSvgElement?.() ?? svgElement;
-    if (!currentSvgElement && format !== 'mmd') {
-      error = 'The diagram preview is not ready to export.';
-      return;
-    }
-
-    loading = true;
+    action = 'download';
     try {
-      const result = await exportDiagram({
-        background,
-        code,
-        config,
-        format,
-        svgElement: currentSvgElement as SVGSVGElement,
-        title
-      });
-      downloadDiagramExport(result);
+      downloadDiagramExport(await createExport(format));
     } catch (caught) {
       error = caught instanceof Error ? caught.message : 'The diagram could not be exported.';
     } finally {
-      loading = false;
+      action = null;
+    }
+  };
+
+  const copyPng = async (): Promise<void> => {
+    error = '';
+    copied = false;
+    action = 'copy';
+    try {
+      await copyPngExport(createExport('png'));
+      copied = true;
+      setTimeout(() => (copied = false), 1500);
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : 'The PNG could not be copied.';
+    } finally {
+      action = null;
     }
   };
 
   const handleOpenChange = (nextOpen: boolean): void => {
-    if (!nextOpen) error = '';
+    if (!nextOpen) {
+      error = '';
+      copied = false;
+      currentSvgElement = null;
+    }
   };
 </script>
 
@@ -101,13 +137,18 @@
           </div>
         </fieldset>
 
-        <fieldset disabled={format === 'mmd'} class="disabled:opacity-50">
+        <fieldset disabled={format === 'mmd' || format === 'pdf'} class="disabled:opacity-50">
           <legend class="mb-2 text-sm font-semibold">Background</legend>
           <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {#each ['white', 'dark', 'transparent', 'custom'] as value (value)}
+            {#each ['white', 'black', 'transparent', 'custom'] as value (value)}
               <label
-                class="flex cursor-pointer items-center gap-2 rounded-md border border-input p-2 text-sm">
-                <input type="radio" name="export-background" bind:group={backgroundType} {value} />
+                class="flex cursor-pointer items-center gap-2 rounded-md border border-input p-2 text-sm font-medium has-checked:border-primary has-checked:bg-primary/10 has-checked:ring-1 has-checked:ring-primary">
+                <input
+                  class="accent-primary"
+                  type="radio"
+                  name="export-background"
+                  bind:group={backgroundType}
+                  {value} />
                 <span class="capitalize">{value}</span>
               </label>
             {/each}
@@ -150,12 +191,23 @@
     {/if}
 
     <Dialog.Footer>
-      <Dialog.Close class={buttonVariants({ variant: 'outline' })} disabled={loading}>
+      <Dialog.Close class={buttonVariants({ variant: 'outline' })} disabled={action !== null}>
         Cancel
       </Dialog.Close>
-      <Button onclick={download} disabled={loading || (!svgElement && format !== 'mmd')}>
+      {#if format === 'png'}
+        <Button
+          variant="outline"
+          onclick={copyPng}
+          disabled={action !== null || !currentSvgElement}>
+          <CopyIcon />
+          {action === 'copy' ? 'Copying...' : copied ? 'Copied PNG' : 'Copy PNG'}
+        </Button>
+      {/if}
+      <Button
+        onclick={download}
+        disabled={action !== null || (!currentSvgElement && format !== 'mmd')}>
         <DownloadIcon />
-        {loading ? 'Preparing export...' : `Download ${format.toUpperCase()}`}
+        {action === 'download' ? 'Preparing export...' : `Download ${format.toUpperCase()}`}
       </Button>
     </Dialog.Footer>
   </Dialog.Content>

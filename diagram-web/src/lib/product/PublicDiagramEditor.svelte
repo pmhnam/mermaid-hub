@@ -7,7 +7,12 @@
   import { defaultState } from '$lib/constants';
   import { ApiClient, ApiError } from '$lib/product/api';
   import { CollaborativeDocumentController } from '$lib/product/collaboration/CollaborativeDocumentController';
-  import { presenceInitials } from '$lib/product/collaboration/presence';
+  import PreviewCursors from '$lib/product/collaboration/PreviewCursors.svelte';
+  import {
+    presenceInitials,
+    presenceRevision,
+    type RemotePreviewCursor
+  } from '$lib/product/collaboration/presence';
   import ExportDialog from '$lib/product/ExportDialog.svelte';
   import {
     isPublicLinkMode,
@@ -15,6 +20,7 @@
     publicShareToken
   } from '$lib/product/public-share';
   import type { PublicDiagram } from '$lib/product/types';
+  import type { SourceRange, SourceSelectionRequest } from '$lib/types';
   import { PanZoomState } from '$lib/util/panZoom';
   import { silentlySanitizeConfig } from '$lib/util/sanitize';
   import {
@@ -39,14 +45,20 @@
   let error = $state('');
   let collaborationError = $state('');
   let presence = $state<{ color: string; displayName: string; userId: string }[]>([]);
+  let previewCursors = $state<RemotePreviewCursor[]>([]);
   let collaborationRole = $state<'editor' | 'owner' | 'viewer'>('viewer');
   let mobilePanel = $state<'editor' | 'preview'>('editor');
   let width = $state(0);
   let exportOpen = $state(false);
   let exportSvgElement = $state<SVGSVGElement | null>(null);
   let previewElement = $state<HTMLElement | null>(null);
+  let selectionRequest = $state<SourceSelectionRequest | undefined>();
+  let selectionId = 0;
   let isMobile = $derived(width < 768);
   let editable = $derived(diagram?.mode === 'public_edit' && collaborationRole === 'editor');
+  let previewRevision = $derived(
+    presenceRevision(validatedState.current.code, validatedState.current.mermaid)
+  );
   let routeDestroyed = false;
   let cleanup = (): void => undefined;
 
@@ -61,6 +73,13 @@
 
   const enterFullscreen = async (): Promise<void> => {
     await previewElement?.requestFullscreen();
+  };
+
+  const selectSource = (range: SourceRange): void => {
+    if (!editable) return;
+    mobilePanel = 'editor';
+    updateCodeStore({ editorMode: 'code' });
+    selectionRequest = { ...range, id: ++selectionId };
   };
 
   const displayDocument = (content: string, config: string, initial = false): void => {
@@ -104,7 +123,7 @@
         browserOrigin: window.location.origin,
         diagramId: sharedDiagram.id,
         getTicket: () => api.createPublicCollaborationTicket(token),
-        user: publicGuestIdentity(sessionStorage)
+        user: publicGuestIdentity(sessionStorage, sharedDiagram.id)
       });
       controller = collaboration;
 
@@ -124,6 +143,7 @@
           if (diagram.mode !== mode) diagram = { ...diagram, mode };
         }
         presence = collaboration.presence;
+        previewCursors = collaboration.previewCursors;
         if (collaboration.synced) {
           collaborationReady = true;
           syncDocument();
@@ -185,7 +205,7 @@
         {#each presence.slice(0, 5) as user (user.userId)}
           <span
             class="grid size-8 place-items-center rounded-full border-2 border-white text-[10px] font-bold text-white"
-            style={`background: ${user.color}`}
+            style={`background-color: ${user.color}`}
             title={user.displayName}>{presenceInitials(user.displayName)}</span>
         {/each}
       </div>
@@ -273,6 +293,7 @@
           {#if collaborationReady && controller}
             <Editor
               {isMobile}
+              {selectionRequest}
               collaboration={{
                 awareness: controller.awareness,
                 code: controller.code,
@@ -294,7 +315,17 @@
           'md:block'
         ]}
         aria-label="Diagram preview">
-        <View {panZoomState} shouldShowGrid={validatedState.current.grid} />
+        <View
+          onSourceSelect={selectSource}
+          {panZoomState}
+          shouldShowGrid={validatedState.current.grid} />
+        {#if controller}
+          <PreviewCursors
+            container={previewElement}
+            {controller}
+            cursors={previewCursors}
+            revision={previewRevision} />
+        {/if}
         <div class="absolute top-3 right-3 flex items-start gap-2">
           <PanZoomToolbar {panZoomState} compact />
           <Button
@@ -310,6 +341,13 @@
   {:else}
     <main bind:this={previewElement} class="relative min-h-0 flex-1" aria-label="Diagram preview">
       <View {panZoomState} shouldShowGrid={validatedState.current.grid} />
+      {#if controller}
+        <PreviewCursors
+          container={previewElement}
+          {controller}
+          cursors={previewCursors}
+          revision={previewRevision} />
+      {/if}
       <div class="absolute top-3 right-3 flex items-start gap-2">
         <PanZoomToolbar {panZoomState} compact />
         <Button

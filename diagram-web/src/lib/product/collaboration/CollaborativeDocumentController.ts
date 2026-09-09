@@ -1,5 +1,12 @@
 import type { TicketLoader } from './lifecycle';
-import { presenceColor, readPresence, type PresenceUser } from './presence';
+import {
+  presenceColor,
+  readPresence,
+  readPreviewCursors,
+  type PresenceUser,
+  type PreviewCursorPosition,
+  type RemotePreviewCursor
+} from './presence';
 import { reconnectDelay, websocketProviderAddress } from './lifecycle';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
@@ -36,6 +43,7 @@ export class CollaborativeDocumentController {
   readonly config = this.doc.getText('config');
   error = '';
   presence: PresenceUser[] = [];
+  previewCursors: RemotePreviewCursor[] = [];
   role: 'editor' | 'owner' | 'viewer' = 'viewer';
   status: CollaborationStatus = 'disconnected';
   synced = false;
@@ -58,6 +66,10 @@ export class CollaborativeDocumentController {
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  setPreviewCursor(position: PreviewCursorPosition | null): void {
+    this.provider?.awareness.setLocalStateField('previewCursor', position);
   }
 
   async start(): Promise<void> {
@@ -105,6 +117,7 @@ export class CollaborativeDocumentController {
       provider.awareness.setLocalStateField('user', {
         color: presenceColor(this.options.user.id),
         displayName: this.options.user.displayName,
+        name: this.options.user.displayName,
         userId: this.options.user.id
       } satisfies PresenceUser);
       provider.awareness.on('change', this.handleAwarenessChange);
@@ -128,6 +141,7 @@ export class CollaborativeDocumentController {
   private readonly handleAwarenessChange = (): void => {
     if (!this.provider) return;
     this.presence = readPresence(this.provider.awareness, this.doc.clientID);
+    this.previewCursors = readPreviewCursors(this.provider.awareness, this.doc.clientID);
     this.emit();
   };
 

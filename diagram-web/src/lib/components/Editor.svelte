@@ -13,9 +13,10 @@
 
   import type { EditorProps } from '$lib/types';
 
-  const { isMobile, collaboration } = $props<{
+  const { isMobile, collaboration, selectionRequest } = $props<{
     collaboration?: EditorProps['collaboration'];
     isMobile: boolean;
+    selectionRequest?: EditorProps['selectionRequest'];
   }>();
   const onUpdate = (text: string) => {
     if (validatedState.current.editorMode === 'code') {
@@ -47,9 +48,9 @@
 
 <div class="flex h-full flex-col">
   {#if isMobile}
-    <MobileEditor {collaboration} {onUpdate} />
+    <MobileEditor {collaboration} {onUpdate} {selectionRequest} />
   {:else}
-    <DesktopEditor {collaboration} {onUpdate} />
+    <DesktopEditor {collaboration} {onUpdate} {selectionRequest} />
   {/if}
   {#if showError && validatedState.current.error instanceof Error}
     <div class="flex flex-col text-sm" data-testid={TID.errorContainer}>

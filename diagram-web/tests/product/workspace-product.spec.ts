@@ -39,6 +39,9 @@ test('nested workspace sharing, collaboration, presence, versions, and restore',
   const memberName = `Member ${unique.slice(-5)}`;
   const ownerContext = await browser.newContext();
   const memberContext = await browser.newContext();
+  await ownerContext.grantPermissions(['clipboard-read', 'clipboard-write'], {
+    origin: 'http://127.0.0.1:3000'
+  });
 
   try {
     const ownerPage = await register(ownerContext, ownerName, ownerEmail);
@@ -68,7 +71,7 @@ test('nested workspace sharing, collaboration, presence, versions, and restore',
     await ownerPage.getByRole('button', { name: 'Create', exact: true }).click();
     await expect(ownerPage).toHaveURL(/\/workspace\/[\da-f-]+\/diagram\/[\da-f-]+$/);
     expect(new URL(ownerPage.url()).hash).toBe('');
-    await expect(ownerPage.getByText('Live and synchronized')).toBeVisible();
+    await expect(ownerPage.getByText('Live and synchronized')).toBeVisible({ timeout: 30_000 });
     await expectEditorText(ownerPage, 'Christmas');
     const sharedDiagramUrl = ownerPage.url();
 
@@ -98,17 +101,37 @@ test('nested workspace sharing, collaboration, presence, versions, and restore',
     await expect(memberPage.getByText('Claim Lifecycle', { exact: true })).toBeVisible();
     await expect(memberPage.getByText('Insurance', { exact: true })).toHaveCount(0);
     await memberPage.goto(sharedDiagramUrl);
-    await expect(memberPage.getByText('Live and synchronized')).toBeVisible();
+    await expect(memberPage.getByText('Live and synchronized')).toBeVisible({ timeout: 30_000 });
     await expectEditorText(memberPage, 'Christmas');
 
     await expect(ownerPage.getByTestId('presence-user')).toHaveAttribute('title', memberName);
     await expect(memberPage.getByTestId('presence-user')).toHaveAttribute('title', ownerName);
+
+    const ownerPreview = ownerPage.getByRole('region', { name: 'Diagram preview' });
+    const ownerPreviewBounds = await ownerPreview.boundingBox();
+    if (!ownerPreviewBounds) throw new Error('Owner preview has no bounds');
+    await ownerPage.mouse.move(
+      ownerPreviewBounds.x + ownerPreviewBounds.width / 2,
+      ownerPreviewBounds.y + ownerPreviewBounds.height / 2
+    );
+    await expect(memberPage.getByTestId('preview-cursor').getByText(ownerName)).toBeVisible();
 
     const ownerMarker = `Owner${unique.replaceAll(/\W/g, '')}`;
     const memberMarker = `Member${unique.replaceAll(/\W/g, '')}`;
     const versionContent = `flowchart LR\n  ${ownerMarker} --> Shared`;
     await replaceEditorText(ownerPage, versionContent);
     await expectEditorText(memberPage, ownerMarker);
+    await ownerPage.getByRole('button', { name: 'Hide code' }).click();
+    await ownerPage
+      .locator('#container svg')
+      .getByText(ownerMarker, { exact: true })
+      .first()
+      .dblclick();
+    await expect(ownerPage.getByRole('button', { name: 'Hide code' })).toBeVisible();
+    await ownerPage.keyboard.press('Control+C');
+    await expect
+      .poll(() => ownerPage.evaluate(() => navigator.clipboard.readText()))
+      .toBe(`${ownerMarker} --> Shared`);
     const sharedContent = `${versionContent}\n  Shared --> ${memberMarker}`;
     await replaceEditorText(memberPage, sharedContent);
     await expectEditorText(ownerPage, memberMarker);

@@ -11,10 +11,16 @@
   import { ApiError } from '$lib/product/api';
   import { auth } from '$lib/product/auth.svelte';
   import { CollaborativeDocumentController } from '$lib/product/collaboration/CollaborativeDocumentController';
-  import { presenceInitials } from '$lib/product/collaboration/presence';
+  import PreviewCursors from '$lib/product/collaboration/PreviewCursors.svelte';
+  import {
+    presenceInitials,
+    presenceRevision,
+    type RemotePreviewCursor
+  } from '$lib/product/collaboration/presence';
   import ExportDialog from '$lib/product/ExportDialog.svelte';
   import ShareDialog from '$lib/product/ShareDialog.svelte';
   import type { Diagram, DiagramVersion, ResourceRole } from '$lib/product/types';
+  import type { SourceRange, SourceSelectionRequest } from '$lib/types';
   import { createVersionDiff } from '$lib/product/version-diff';
   import { PanZoomState } from '$lib/util/panZoom';
   import {
@@ -43,6 +49,7 @@
   let role = $state<ResourceRole>('viewer');
   let controller = $state<CollaborativeDocumentController | null>(null);
   let presence = $state<{ color: string; displayName: string; userId: string }[]>([]);
+  let previewCursors = $state<RemotePreviewCursor[]>([]);
   let mobilePanel = $state<'editor' | 'preview'>('editor');
   let viewportWidth = $state(0);
   let isMobile = $derived(viewportWidth < 768);
@@ -59,6 +66,9 @@
   let actionMessage = $state('');
   let currentContent = $state('');
   let currentConfig = $state('');
+  let selectionRequest = $state<SourceSelectionRequest | undefined>();
+  let selectionId = 0;
+  let previewRevision = $derived(presenceRevision(currentContent, currentConfig));
   let routeDestroyed = false;
   let versionDiff = $derived(
     selectedVersion
@@ -135,6 +145,13 @@
     await previewElement?.requestFullscreen();
   };
 
+  const selectSource = (range: SourceRange): void => {
+    editorOpen = true;
+    mobilePanel = 'editor';
+    updateCodeStore({ editorMode: 'code' });
+    selectionRequest = { ...range, id: ++selectionId };
+  };
+
   const initialize = async (): Promise<void> => {
     disableURLSubscription();
     if (window.location.hash) {
@@ -175,6 +192,7 @@
         collaborationStatus = collaboration.status;
         collaborationError = collaboration.error;
         presence = collaboration.presence;
+        previewCursors = collaboration.previewCursors;
         role = collaboration.role;
         if (collaboration.synced && !loaded) {
           syncDocument();
@@ -241,7 +259,7 @@
           <span
             data-testid="presence-user"
             class="grid size-8 place-items-center rounded-full border-2 border-slate-950 text-[10px] font-bold text-white"
-            style={`background: ${user.color}`}
+            style={`background-color: ${user.color}`}
             title={user.displayName}>{presenceInitials(user.displayName)}</span>
         {/each}
       </div>
@@ -387,6 +405,7 @@
         {#if controller}
           <Editor
             {isMobile}
+            {selectionRequest}
             collaboration={{
               awareness: controller.awareness,
               code: controller.code,
@@ -403,7 +422,17 @@
       bind:this={previewElement}
       class="relative h-full min-h-0 overflow-hidden bg-[#f8f7f4]"
       aria-label="Diagram preview">
-      <View {panZoomState} shouldShowGrid={validatedState.current.grid} />
+      <View
+        onSourceSelect={selectSource}
+        {panZoomState}
+        shouldShowGrid={validatedState.current.grid} />
+      {#if controller}
+        <PreviewCursors
+          container={previewElement}
+          {controller}
+          cursors={previewCursors}
+          revision={previewRevision} />
+      {/if}
       <div class="absolute top-3 right-3 flex items-start gap-2">
         <PanZoomToolbar {panZoomState} compact />
         <Button

@@ -38,6 +38,11 @@ describe('product diagram export', () => {
     );
   });
 
+  it('uses exact white and black backgrounds', () => {
+    expect(serializeDiagramSvg(createSvg(), { type: 'white' })).toContain('fill="#ffffff"');
+    expect(serializeDiagramSvg(createSvg(), { type: 'black' })).toContain('fill="#000000"');
+  });
+
   it('writes config and code to a Mermaid file', () => {
     expect(buildMermaidFile('flowchart LR\nA-->B', '{ "theme": "dark" }')).toBe(
       '---\nconfig: {"theme":"dark"}\n---\nflowchart LR\nA-->B'

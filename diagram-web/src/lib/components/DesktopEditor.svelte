@@ -14,11 +14,13 @@
   import { MonacoBinding } from 'y-monaco';
   import AIPromptPopup from './AIPromptPopup.svelte';
 
-  const { onUpdate, collaboration }: EditorProps = $props();
+  const { onUpdate, collaboration, selectionRequest }: EditorProps = $props();
 
   let divElement: HTMLDivElement | undefined = $state();
   let aiPromptPopupElement: HTMLDivElement | undefined = $state();
   let editor: monaco.editor.IStandaloneCodeEditor | undefined;
+  let editorReady = $state(false);
+  let handledSelectionId = -1;
   let collaborationBindings: MonacoBinding[] = [];
   let editorOptions = {
     minimap: {
@@ -131,6 +133,7 @@
     initEditor(monaco);
     errorDebug();
     editor = monaco.editor.create(divElement, editorOptions);
+    editorReady = true;
     if (collaboration) {
       const editors = new Set([editor]);
       collaborationBindings = [
@@ -201,7 +204,7 @@
 
   $effect(() => {
     const { errorMarkers, editorMode, code, mermaid } = validatedState.current;
-    if (!editor) {
+    if (!editorReady || !editor) {
       return;
     }
 
@@ -241,6 +244,27 @@
     // Display/clear errors
     monaco.editor.setModelMarkers(model, 'mermaid', errorMarkers);
     editor.updateOptions({ readOnly: collaboration?.readOnly ?? false });
+  });
+
+  $effect(() => {
+    const request = selectionRequest;
+    if (
+      !request ||
+      request.id === handledSelectionId ||
+      validatedState.current.editorMode !== 'code' ||
+      !editorReady ||
+      !editor
+    ) {
+      return;
+    }
+    editor.setModel(mermaidModel);
+    const start = mermaidModel.getPositionAt(request.start);
+    const end = mermaidModel.getPositionAt(request.end);
+    const range = new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column);
+    editor.setSelection(range);
+    editor.revealRangeInCenter(range);
+    editor.focus();
+    handledSelectionId = request.id;
   });
 </script>
 

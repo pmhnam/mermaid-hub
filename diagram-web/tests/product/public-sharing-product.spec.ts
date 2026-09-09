@@ -25,13 +25,28 @@ test('public links support view, edit, export, and immediate revocation', async 
   const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const ownerContext = await browser.newContext();
   const guestContext = await browser.newContext({ acceptDownloads: true });
+  await guestContext.addInitScript(() => {
+    class TestClipboardItem {
+      constructor(readonly items: Record<string, Blob>) {}
+    }
+    Object.defineProperty(window, 'ClipboardItem', { value: TestClipboardItem });
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        write: async (items: TestClipboardItem[]) => {
+          const mimeType = Object.keys(items[0]?.items ?? {})[0];
+          await Promise.all(Object.values(items[0]?.items ?? {}));
+          (window as Window & { copiedMimeType?: string }).copiedMimeType = mimeType;
+        }
+      }
+    });
+  });
 
   try {
     const ownerPage = await register(ownerContext, `public-${unique}@example.test`);
     await ownerPage.getByRole('button', { name: 'Diagram', exact: true }).click();
     await ownerPage.getByLabel('Diagram title').fill('Public Architecture');
     await ownerPage.getByRole('button', { name: 'Create', exact: true }).click();
-    await expect(ownerPage.getByText('Live and synchronized')).toBeVisible();
+    await expect(ownerPage.getByText('Live and synchronized')).toBeVisible({ timeout: 30_000 });
 
     await ownerPage.getByRole('button', { name: 'Share' }).click();
     await expect(ownerPage.getByRole('heading', { name: 'Share diagram' })).toBeVisible();
@@ -53,6 +68,14 @@ test('public links support view, edit, export, and immediate revocation', async 
 
     await guestPage.getByRole('button', { name: 'Export' }).click();
     await expect(guestPage.getByRole('heading', { name: 'Export diagram' })).toBeVisible();
+    await guestPage.getByText('black', { exact: true }).click();
+    await guestPage.getByRole('button', { name: 'Copy PNG' }).click();
+    await expect(guestPage.getByRole('button', { name: 'Copied PNG' })).toBeVisible();
+    expect(
+      await guestPage.evaluate(
+        () => (window as Window & { copiedMimeType?: string }).copiedMimeType
+      )
+    ).toBe('image/png');
     await guestPage.getByText('MMD', { exact: true }).click();
     const downloadPromise = guestPage.waitForEvent('download');
     await guestPage.getByRole('button', { name: 'Download MMD' }).click();
@@ -96,8 +119,7 @@ test('public links support view, edit, export, and immediate revocation', async 
       revokedPage.getByRole('heading', { name: 'Shared diagram unavailable' })
     ).toBeVisible();
   } finally {
-    await ownerContext.close();
-    await guestContext.close();
+    await Promise.allSettled([ownerContext.close(), guestContext.close()]);
   }
 });
 
@@ -114,6 +136,12 @@ test('workspace navigation and editor controls adapt to a narrow viewport', asyn
     await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
     await page.getByRole('button', { name: 'Preview' }).click();
     await expect(page.getByRole('region', { name: 'Diagram preview' })).toBeVisible();
+    await page.locator('#container svg').getByText('Christmas', { exact: true }).first().dblclick();
+    await expect(page.getByRole('button', { name: 'Edit' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await page.getByRole('button', { name: 'Preview' }).click();
     await expect(page.getByRole('button', { name: 'Full screen' })).toBeVisible();
     await page.setViewportSize({ height: 900, width: 960 });
     await expect(page.getByRole('button', { name: 'Hide code' })).toBeVisible();
