@@ -1,0 +1,12 @@
+**/node_modules/
+**/dist/
+**/coverage/
+**/.svelte-kit/
+**/docs/
+**/test-results/
+**/playwright-report/
+**/*.tsbuildinfo
+**/.env
+**/.env.local
+*.Zone.Identifier
+*.log
