@@ -95,6 +95,25 @@ export interface CollaborationTicket {
   websocketPath: string;
 }
 
+export type PublicLinkMode = 'public_edit' | 'public_read';
+
+export interface PublicLink {
+  createdAt: string;
+  diagramId: string;
+  mode: PublicLinkMode;
+  shareToken: string;
+  updatedAt: string;
+}
+
+export interface PublicDiagram {
+  currentConfig: string;
+  currentContent: string;
+  id: string;
+  mode: PublicLinkMode;
+  title: string;
+  updatedAt: string;
+}
+
 export interface DiagramVersion {
   config: string;
   content: string;

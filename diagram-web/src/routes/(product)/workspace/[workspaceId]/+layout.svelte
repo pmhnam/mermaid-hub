@@ -18,6 +18,7 @@
   import { goto } from '$app/navigation';
   import { onMount, type Snippet } from 'svelte';
   import ChevronRight from '~icons/material-symbols/chevron-right-rounded';
+  import CollapseIcon from '~icons/material-symbols/keyboard-double-arrow-left-rounded';
   import DiagramIcon from '~icons/material-symbols/insert-chart-outline-rounded';
   import FolderIcon from '~icons/material-symbols/folder-outline-rounded';
   import MenuIcon from '~icons/material-symbols/menu-rounded';
@@ -29,6 +30,7 @@
   let tree = $state<WorkspaceTree | null>(null);
   let error = $state('');
   let sidebarOpen = $state(false);
+  let sidebarCollapsed = $state(false);
   let creation = $state<'diagram' | 'folder' | null>(null);
   let name = $state('');
   let folderId = $state('');
@@ -67,6 +69,7 @@
   });
 
   const openCreation = (kind: 'diagram' | 'folder'): void => {
+    sidebarCollapsed = false;
     creation = kind;
     name = '';
     folderId = '';
@@ -126,6 +129,7 @@
           title: name.trim()
         });
         await loadTree();
+        sidebarOpen = false;
         await goto(`${base}/workspace/${params.workspaceId}/diagram/${diagram.id}`);
       }
       creation = null;
@@ -219,36 +223,57 @@
 
   <aside
     class={[
-      'fixed inset-y-0 left-0 z-30 flex w-[19rem] flex-col border-r border-slate-800 bg-slate-950 text-slate-100 transition-transform md:relative md:translate-x-0',
+      'fixed inset-y-0 left-0 z-30 flex w-[19rem] flex-col border-r border-slate-800 bg-slate-950 text-slate-100 transition-[transform,width] md:relative md:translate-x-0',
+      sidebarCollapsed ? 'md:w-16' : 'md:w-[19rem]',
       sidebarOpen ? 'translate-x-0' : '-translate-x-full'
     ]}>
-    <header class="border-b border-white/10 px-5 py-5">
-      <a class="font-semibold tracking-tight" href={`${base}/edit`}>Mermaid</a>
-      <p class="mt-4 truncate text-lg font-medium">
-        {tree?.workspace.name ?? 'Loading workspace…'}
-      </p>
-      <p class="mt-1 font-mono text-[10px] tracking-[0.18em] text-slate-500 uppercase">
-        {tree?.workspace.kind ?? 'Workspace'}
-      </p>
+    <header class="border-b border-white/10 px-4 py-4">
+      <div class="flex items-center justify-between gap-2">
+        <a class="truncate font-semibold tracking-tight" href={`${base}/edit`}
+          >{sidebarCollapsed ? 'M' : 'Mermaid'}</a>
+        <Button
+          class={[
+            'hidden text-slate-400 hover:bg-white/10 hover:text-white md:inline-flex',
+            sidebarCollapsed && 'rotate-180'
+          ]}
+          variant="ghost"
+          size="icon"
+          aria-label={sidebarCollapsed
+            ? 'Expand workspace navigation'
+            : 'Collapse workspace navigation'}
+          onclick={() => (sidebarCollapsed = !sidebarCollapsed)}><CollapseIcon /></Button>
+      </div>
+      {#if !sidebarCollapsed}
+        <p class="mt-4 truncate text-lg font-medium">
+          {tree?.workspace.name ?? 'Loading workspace…'}
+        </p>
+        <p class="mt-1 font-mono text-[10px] tracking-[0.18em] text-slate-500 uppercase">
+          {tree?.workspace.kind ?? 'Workspace'}
+        </p>
+      {/if}
     </header>
 
-    <div class="grid grid-cols-2 gap-2 px-4 py-4">
+    <div class={['grid gap-2 px-3 py-4', sidebarCollapsed ? 'grid-cols-1' : 'grid-cols-2']}>
       <Button
         class="border-white/15 bg-white/5 text-slate-100 hover:bg-white/10"
         variant="outline"
         size="sm"
+        title="Create folder"
         onclick={() => openCreation('folder')}>
-        <FolderIcon /> Folder
+        <FolderIcon />
+        <span class:sr-only={sidebarCollapsed}>Folder</span>
       </Button>
       <Button
         class="bg-rose-600 text-white hover:bg-rose-500"
         size="sm"
+        title="Create diagram"
         onclick={() => openCreation('diagram')}>
-        <PlusIcon /> Diagram
+        <PlusIcon />
+        <span class:sr-only={sidebarCollapsed}>Diagram</span>
       </Button>
     </div>
 
-    {#if creation}
+    {#if creation && !sidebarCollapsed}
       <form
         class="mx-4 mb-4 space-y-3 rounded-lg border border-white/10 bg-white/5 p-3"
         onsubmit={create}>
@@ -288,7 +313,7 @@
       </form>
     {/if}
 
-    {#if management && tree}
+    {#if management && tree && !sidebarCollapsed}
       <form
         class="mx-4 mb-4 space-y-3 rounded-lg border border-white/10 bg-white/5 p-3"
         aria-label={`Manage ${management.kind}`}
@@ -352,14 +377,16 @@
             <div
               class="flex h-9 items-center gap-2 rounded-md pr-1 text-sm text-slate-400 hover:bg-white/5"
               style={`padding-left: ${0.5 + row.depth * 0.8}rem`}>
-              <ChevronRight class="size-4" />
+              {#if !sidebarCollapsed}<ChevronRight class="size-4" />{/if}
               <FolderIcon class="size-4" />
-              <span class="min-w-0 flex-1 truncate">{row.folder.name}</span>
-              <button
-                class="grid size-7 shrink-0 place-items-center rounded hover:bg-white/10 hover:text-white"
-                aria-label={`Manage folder ${row.folder.name}`}
-                onclick={() => row.folder && openManagement('folder', row.folder.id)}
-                ><MoreIcon /></button>
+              {#if !sidebarCollapsed}
+                <span class="min-w-0 flex-1 truncate">{row.folder.name}</span>
+                <button
+                  class="grid size-7 shrink-0 place-items-center rounded hover:bg-white/10 hover:text-white"
+                  aria-label={`Manage folder ${row.folder.name}`}
+                  onclick={() => row.folder && openManagement('folder', row.folder.id)}
+                  ><MoreIcon /></button>
+              {/if}
             </div>
           {:else if row.diagram}
             <div
@@ -370,16 +397,20 @@
               style={`padding-left: ${0.5 + row.depth * 0.8}rem`}>
               <a
                 class="flex min-w-0 flex-1 items-center gap-2 text-sm text-slate-200"
+                aria-label={row.diagram.title}
+                title={row.diagram.title}
                 href={`${base}/workspace/${params.workspaceId}/diagram/${row.diagram.id}`}
                 onclick={() => (sidebarOpen = false)}>
                 <DiagramIcon class="size-4 shrink-0 text-rose-400" />
-                <span class="truncate">{row.diagram.title}</span>
+                {#if !sidebarCollapsed}<span class="truncate">{row.diagram.title}</span>{/if}
               </a>
-              <button
-                class="grid size-7 shrink-0 place-items-center rounded text-slate-400 hover:bg-white/10 hover:text-white"
-                aria-label={`Manage diagram ${row.diagram.title}`}
-                onclick={() => row.diagram && openManagement('diagram', row.diagram.id)}
-                ><MoreIcon /></button>
+              {#if !sidebarCollapsed}
+                <button
+                  class="grid size-7 shrink-0 place-items-center rounded text-slate-400 hover:bg-white/10 hover:text-white"
+                  aria-label={`Manage diagram ${row.diagram.title}`}
+                  onclick={() => row.diagram && openManagement('diagram', row.diagram.id)}
+                  ><MoreIcon /></button>
+              {/if}
             </div>
           {/if}
         {/each}
@@ -387,10 +418,12 @@
     </nav>
 
     <footer class="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-4">
-      <div class="min-w-0">
-        <p class="truncate text-sm">{auth.current.user?.displayName ?? ''}</p>
-        <p class="truncate text-xs text-slate-500">{auth.current.user?.email ?? ''}</p>
-      </div>
+      {#if !sidebarCollapsed}
+        <div class="min-w-0">
+          <p class="truncate text-sm">{auth.current.user?.displayName ?? ''}</p>
+          <p class="truncate text-xs text-slate-500">{auth.current.user?.email ?? ''}</p>
+        </div>
+      {/if}
       <Button
         class="text-slate-400 hover:bg-white/10 hover:text-white"
         variant="ghost"

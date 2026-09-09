@@ -1,4 +1,3 @@
-import type { User } from '../types';
 import type { TicketLoader } from './lifecycle';
 import { presenceColor, readPresence, type PresenceUser } from './presence';
 import { reconnectDelay, websocketProviderAddress } from './lifecycle';
@@ -15,6 +14,12 @@ type ProviderFactory = (
   options: ConstructorParameters<typeof WebsocketProvider>[3]
 ) => Provider;
 
+export interface CollaborationIdentity {
+  displayName: string;
+  email?: string;
+  id: string;
+}
+
 interface ControllerOptions {
   apiBaseUrl: string;
   browserOrigin: string;
@@ -22,7 +27,7 @@ interface ControllerOptions {
   getTicket: TicketLoader;
   providerFactory?: ProviderFactory;
   schedule?: (callback: () => void, delay: number) => ReturnType<typeof setTimeout>;
-  user: User;
+  user: CollaborationIdentity;
 }
 
 export class CollaborativeDocumentController {

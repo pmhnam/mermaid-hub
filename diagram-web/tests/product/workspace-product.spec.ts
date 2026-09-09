@@ -87,6 +87,7 @@ test('nested workspace sharing, collaboration, presence, versions, and restore',
     await expect(ownerPage.getByText(`${memberName}'s role updated to viewer.`)).toBeVisible();
     await memberRoleSelect.selectOption('editor');
     await expect(ownerPage.getByText(`${memberName}'s role updated to editor.`)).toBeVisible();
+    await ownerPage.getByRole('button', { name: 'Close' }).click();
 
     await memberPage.getByLabel('Email address').fill(memberEmail);
     await memberPage.getByLabel('Password').fill(password);

@@ -2,30 +2,38 @@
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
   import Editor from '$lib/components/Editor.svelte';
+  import PanZoomToolbar from '$lib/components/PanZoomToolbar.svelte';
   import View from '$lib/components/View.svelte';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
+  import * as Resizable from '$lib/components/ui/resizable';
   import { defaultState } from '$lib/constants';
   import { ApiError } from '$lib/product/api';
   import { auth } from '$lib/product/auth.svelte';
   import { CollaborativeDocumentController } from '$lib/product/collaboration/CollaborativeDocumentController';
   import { presenceInitials } from '$lib/product/collaboration/presence';
-  import type { Diagram, DiagramVersion, ResourceMember, ResourceRole } from '$lib/product/types';
+  import ExportDialog from '$lib/product/ExportDialog.svelte';
+  import ShareDialog from '$lib/product/ShareDialog.svelte';
+  import type { Diagram, DiagramVersion, ResourceRole } from '$lib/product/types';
   import { createVersionDiff } from '$lib/product/version-diff';
+  import { PanZoomState } from '$lib/util/panZoom';
   import {
     disableURLSubscription,
     replaceInputState,
     updateCodeStore,
     validatedState
   } from '$lib/util/state.svelte';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import CodeIcon from '~icons/custom/code';
+  import DownloadIcon from '~icons/material-symbols/download';
+  import FullscreenIcon from '~icons/material-symbols/fullscreen-rounded';
   import HistoryIcon from '~icons/material-symbols/history-rounded';
   import PreviewIcon from '~icons/material-symbols/visibility-outline-rounded';
   import SettingsIcon from '~icons/material-symbols/settings-outline-rounded';
   import ShareIcon from '~icons/material-symbols/share';
 
   const { diagramId, workspaceId }: { diagramId: string; workspaceId: string } = $props();
+  const panZoomState = new PanZoomState();
   let title = $state('Loading diagram...');
   let diagram = $state<Diagram | null>(null);
   let loaded = $state(false);
@@ -36,20 +44,19 @@
   let controller = $state<CollaborativeDocumentController | null>(null);
   let presence = $state<{ color: string; displayName: string; userId: string }[]>([]);
   let mobilePanel = $state<'editor' | 'preview'>('editor');
-  let width = $state(0);
-  let isMobile = $derived(width < 768);
-  let toolsPanel = $state<'history' | 'share' | null>(null);
+  let viewportWidth = $state(0);
+  let isMobile = $derived(viewportWidth < 768);
+  let historyOpen = $state(false);
+  let shareOpen = $state(false);
+  let exportOpen = $state(false);
+  let editorOpen = $state(true);
+  let previewElement = $state<HTMLElement | null>(null);
+  let exportSvgElement = $state<SVGSVGElement | null>(null);
   let versions = $state<DiagramVersion[]>([]);
   let selectedVersion = $state<DiagramVersion | null>(null);
   let versionsLoading = $state(false);
   let versionMessage = $state('');
-  let memberEmail = $state('');
-  let memberRole = $state<'editor' | 'viewer'>('viewer');
-  let members = $state<ResourceMember[]>([]);
-  let membersLoading = $state(false);
-  let pendingMemberId = $state<string | null>(null);
   let actionMessage = $state('');
-  let actionError = $state(false);
   let currentContent = $state('');
   let currentConfig = $state('');
   let routeDestroyed = false;
@@ -115,98 +122,17 @@
     }
   };
 
-  const share = async (event: SubmitEvent): Promise<void> => {
-    event.preventDefault();
-    if (!diagram || !memberEmail.trim()) return;
-    actionMessage = '';
-    actionError = false;
-    try {
-      const input = { email: memberEmail.trim(), role: memberRole };
-      if (diagram.folderId) await auth.api.addFolderMember(diagram.folderId, input);
-      else await auth.api.addDiagramMember(diagram.id, input);
-      memberEmail = '';
-      actionMessage = 'Access added.';
-      await loadMembers();
-    } catch (caught) {
-      actionError = true;
-      actionMessage = caught instanceof ApiError ? caught.message : 'Unable to add access.';
+  const openExport = async (): Promise<void> => {
+    if (isMobile && mobilePanel !== 'preview') {
+      mobilePanel = 'preview';
+      await tick();
     }
+    exportSvgElement = previewElement?.querySelector('#container svg') ?? null;
+    exportOpen = true;
   };
 
-  const loadMembers = async (): Promise<void> => {
-    if (!diagram) return;
-    membersLoading = true;
-    try {
-      members = diagram.folderId
-        ? await auth.api.getFolderMembers(diagram.folderId)
-        : await auth.api.getDiagramMembers(diagram.id);
-    } catch (caught) {
-      actionError = true;
-      actionMessage = caught instanceof ApiError ? caught.message : 'Unable to load access.';
-    } finally {
-      membersLoading = false;
-    }
-  };
-
-  const openShare = (): void => {
-    if (toolsPanel === 'share') {
-      toolsPanel = null;
-      return;
-    }
-    toolsPanel = 'share';
-    actionMessage = '';
-    actionError = false;
-    void loadMembers();
-  };
-
-  const updateMemberRole = async (
-    member: ResourceMember,
-    nextRole: 'editor' | 'viewer'
-  ): Promise<void> => {
-    if (!diagram || member.role === nextRole) return;
-    pendingMemberId = member.userId;
-    actionMessage = '';
-    actionError = false;
-    try {
-      const input = { role: nextRole };
-      if (diagram.folderId) {
-        await auth.api.updateFolderMember(diagram.folderId, member.userId, input);
-      } else {
-        await auth.api.updateDiagramMember(diagram.id, member.userId, input);
-      }
-      actionMessage = `${member.displayName}'s role updated to ${nextRole}.`;
-      await loadMembers();
-    } catch (caught) {
-      actionError = true;
-      actionMessage = caught instanceof ApiError ? caught.message : 'Unable to update access.';
-      await loadMembers();
-    } finally {
-      pendingMemberId = null;
-    }
-  };
-
-  const removeMember = async (member: ResourceMember): Promise<void> => {
-    if (!diagram || !confirm(`Remove access for ${member.displayName} (${member.email})?`)) {
-      return;
-    }
-    pendingMemberId = member.userId;
-    actionMessage = '';
-    actionError = false;
-    try {
-      if (diagram.folderId) {
-        await auth.api.deleteFolderMember(diagram.folderId, member.userId);
-      } else {
-        await auth.api.deleteDiagramMember(diagram.id, member.userId);
-      }
-      actionMessage = `Access removed for ${member.displayName}.`;
-      await loadMembers();
-    } catch (caught) {
-      actionError = true;
-      actionMessage = caught instanceof ApiError ? caught.message : 'Unable to remove access.';
-      await loadMembers();
-    } finally {
-      pendingMemberId = null;
-    }
+  const enterFullscreen = async (): Promise<void> => {
+    await previewElement?.requestFullscreen();
   };
 
   const initialize = async (): Promise<void> => {
@@ -292,12 +218,14 @@
   });
 </script>
 
-<div class="flex h-full min-h-0 flex-col" bind:clientWidth={width}>
+<svelte:window bind:innerWidth={viewportWidth} />
+
+<div class="flex h-full min-h-0 flex-col bg-[#f7f6f2]">
   <header
-    class="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2 md:px-5">
+    class="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-slate-950 px-3 py-2 text-slate-100 md:px-5">
     <div class="min-w-0">
       <h1 class="truncate text-sm font-semibold md:text-base">{title}</h1>
-      <p class="text-[11px] text-slate-500" aria-live="polite">
+      <p class="text-[11px] text-slate-400" aria-live="polite">
         {collaborationStatus === 'synced'
           ? role === 'viewer'
             ? 'Live, view only'
@@ -312,25 +240,43 @@
         {#each presence.slice(0, 5) as user (user.userId)}
           <span
             data-testid="presence-user"
-            class="grid size-8 place-items-center rounded-full border-2 border-white text-[10px] font-bold text-white"
+            class="grid size-8 place-items-center rounded-full border-2 border-slate-950 text-[10px] font-bold text-white"
             style={`background: ${user.color}`}
             title={user.displayName}>{presenceInitials(user.displayName)}</span>
         {/each}
       </div>
       <Button
+        class="text-slate-300 hover:bg-white/10 hover:text-white"
         size="sm"
-        variant={toolsPanel === 'history' ? 'secondary' : 'ghost'}
-        onclick={() => (toolsPanel = toolsPanel === 'history' ? null : 'history')}>
+        variant="ghost"
+        aria-pressed={historyOpen}
+        onclick={() => (historyOpen = !historyOpen)}>
         <HistoryIcon /> <span class="hidden sm:inline">Versions</span>
+      </Button>
+      <Button
+        class="text-slate-300 hover:bg-white/10 hover:text-white"
+        size="sm"
+        variant="ghost"
+        onclick={openExport}>
+        <DownloadIcon /> <span class="hidden sm:inline">Export</span>
       </Button>
       {#if role === 'owner'}
         <Button
+          class="bg-rose-600 text-white hover:bg-rose-500"
           size="sm"
-          variant={toolsPanel === 'share' ? 'secondary' : 'ghost'}
-          onclick={openShare}>
+          onclick={() => (shareOpen = true)}>
           <ShareIcon /> <span class="hidden sm:inline">Share</span>
         </Button>
       {/if}
+      <Button
+        class="hidden text-slate-300 hover:bg-white/10 hover:text-white md:inline-flex"
+        size="sm"
+        variant="ghost"
+        aria-pressed={editorOpen}
+        onclick={() => (editorOpen = !editorOpen)}>
+        <CodeIcon />
+        {editorOpen ? 'Hide code' : 'Edit code'}
+      </Button>
       <div class="flex items-center gap-1 rounded-lg bg-slate-100 p-1 md:hidden">
         <Button
           size="sm"
@@ -352,7 +298,7 @@
     </div>
   {/if}
 
-  {#if toolsPanel === 'history'}
+  {#if historyOpen}
     <section class="max-h-[45vh] shrink-0 overflow-auto border-b border-slate-200 bg-white p-4">
       <div class="grid gap-4 lg:grid-cols-[18rem_1fr]">
         <div>
@@ -418,79 +364,65 @@
           {actionMessage}
         </p>{/if}
     </section>
-  {:else if toolsPanel === 'share' && role === 'owner' && diagram}
+  {/if}
+
+  {#snippet editorPanel()}
     <section
-      class="max-h-[45vh] shrink-0 overflow-auto border-b border-slate-200 bg-white p-4"
-      aria-labelledby="share-access-heading">
-      <h2 id="share-access-heading" class="mx-auto mb-3 max-w-2xl font-semibold">Manage access</h2>
-      <form class="mx-auto flex max-w-2xl flex-wrap items-end gap-3" onsubmit={share}>
-        <label class="min-w-56 flex-1 text-sm font-medium">
-          Registered user email
-          <Input class="mt-1" type="email" required bind:value={memberEmail} />
-        </label>
-        <label class="text-sm font-medium">
-          Role
-          <select
-            class="mt-1 block h-9 rounded-md border border-slate-300 bg-white px-3"
-            bind:value={memberRole}>
-            <option value="viewer">Viewer</option>
-            <option value="editor">Editor</option>
-          </select>
-        </label>
-        <Button type="submit">Add access</Button>
-      </form>
-      <p class="mx-auto mt-2 max-w-2xl text-xs text-slate-500">
-        {diagram.folderId
-          ? 'Access applies to this folder and its diagrams.'
-          : 'Access applies to this root diagram.'}
-      </p>
-      <div class="mx-auto mt-4 max-w-2xl border-t border-slate-200 pt-3">
-        <h3 class="text-sm font-semibold">People with direct access</h3>
-        {#if membersLoading && members.length === 0}
-          <p class="mt-2 text-sm text-slate-500" role="status">Loading access...</p>
-        {:else if members.length === 0}
-          <p class="mt-2 text-sm text-slate-500">No direct members yet.</p>
-        {:else}
-          <ul class="mt-2 divide-y divide-slate-200">
-            {#each members as member (member.userId)}
-              <li class="flex flex-wrap items-center gap-3 py-3">
-                <div class="min-w-48 flex-1">
-                  <p class="text-sm font-medium">{member.displayName}</p>
-                  <p class="text-xs text-slate-500">{member.email}</p>
-                </div>
-                <label class="text-xs font-medium" for={`member-role-${member.userId}`}>Role</label>
-                <select
-                  id={`member-role-${member.userId}`}
-                  aria-label={`Role for ${member.displayName}`}
-                  class="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
-                  value={member.role}
-                  disabled={pendingMemberId === member.userId}
-                  onchange={(event) =>
-                    updateMemberRole(member, event.currentTarget.value as 'editor' | 'viewer')}>
-                  <option value="viewer">Viewer</option>
-                  <option value="editor">Editor</option>
-                </select>
-                <Button
-                  variant="destructive"
-                  disabled={pendingMemberId === member.userId}
-                  aria-label={`Remove access for ${member.displayName}`}
-                  onclick={() => removeMember(member)}>Remove</Button>
-              </li>
-            {/each}
-          </ul>
+      data-testid="product-editor"
+      class="flex h-full min-h-0 flex-col bg-white"
+      aria-label="Diagram editor">
+      <div class="flex h-11 shrink-0 items-center gap-1 border-b border-slate-200 bg-slate-50 px-3">
+        <Button
+          size="sm"
+          variant={validatedState.current.editorMode === 'code' ? 'secondary' : 'ghost'}
+          aria-pressed={validatedState.current.editorMode === 'code'}
+          onclick={() => updateCodeStore({ editorMode: 'code' })}><CodeIcon /> Code</Button>
+        <Button
+          size="sm"
+          variant={validatedState.current.editorMode === 'config' ? 'secondary' : 'ghost'}
+          aria-pressed={validatedState.current.editorMode === 'config'}
+          onclick={() => updateCodeStore({ editorMode: 'config' })}><SettingsIcon /> Config</Button>
+      </div>
+      <div class="min-h-0 flex-1">
+        {#if controller}
+          <Editor
+            {isMobile}
+            collaboration={{
+              awareness: controller.awareness,
+              code: controller.code,
+              config: controller.config,
+              readOnly: role === 'viewer'
+            }} />
         {/if}
       </div>
-      {#if actionMessage}<p
-          class={[
-            'mx-auto mt-2 max-w-2xl text-sm',
-            actionError ? 'text-red-700' : 'text-slate-600'
-          ]}
-          role={actionError ? 'alert' : 'status'}
-          aria-live="polite">
-          {actionMessage}
-        </p>{/if}
     </section>
-  {/if}
+  {/snippet}
+
+  {#snippet previewPanel()}
+    <section
+      bind:this={previewElement}
+      class="relative h-full min-h-0 overflow-hidden bg-[#f8f7f4]"
+      aria-label="Diagram preview">
+      <View {panZoomState} shouldShowGrid={validatedState.current.grid} />
+      <div class="absolute top-3 right-3 flex items-start gap-2">
+        <PanZoomToolbar {panZoomState} compact />
+        <Button
+          class="border border-slate-200 bg-white shadow-sm hover:bg-slate-100"
+          variant="ghost"
+          size="icon"
+          title="Full screen"
+          aria-label="Full screen"
+          onclick={enterFullscreen}><FullscreenIcon /></Button>
+      </div>
+      {#if !editorOpen && !isMobile}
+        <Button
+          class="absolute top-3 left-3 border border-slate-200 bg-white shadow-sm hover:bg-slate-100"
+          variant="ghost"
+          size="sm"
+          onclick={() => (editorOpen = true)}><CodeIcon /> Edit code</Button>
+      {/if}
+    </section>
+  {/snippet}
 
   {#if !loaded && !error}
     <div class="grid min-h-0 flex-1 place-items-center" role="status">
@@ -502,49 +434,38 @@
       </div>
     </div>
   {:else if loaded && controller}
-    <div class="grid min-h-0 flex-1 md:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.2fr)]">
-      <section
-        data-testid="product-editor"
-        class={[
-          'min-h-0 flex-col border-r border-slate-200 bg-white',
-          mobilePanel === 'editor' ? 'flex' : 'hidden',
-          'md:flex'
-        ]}
-        aria-label="Diagram editor">
-        <div
-          class="flex h-11 shrink-0 items-center gap-1 border-b border-slate-200 bg-slate-50 px-3">
-          <Button
-            size="sm"
-            variant={validatedState.current.editorMode === 'code' ? 'secondary' : 'ghost'}
-            aria-pressed={validatedState.current.editorMode === 'code'}
-            onclick={() => updateCodeStore({ editorMode: 'code' })}><CodeIcon /> Code</Button>
-          <Button
-            size="sm"
-            variant={validatedState.current.editorMode === 'config' ? 'secondary' : 'ghost'}
-            aria-pressed={validatedState.current.editorMode === 'config'}
-            onclick={() => updateCodeStore({ editorMode: 'config' })}
-            ><SettingsIcon /> Config</Button>
-        </div>
-        <div class="min-h-0 flex-1">
-          <Editor
-            {isMobile}
-            collaboration={{
-              awareness: controller.awareness,
-              code: controller.code,
-              config: controller.config,
-              readOnly: role === 'viewer'
-            }} />
-        </div>
-      </section>
-      <section
-        class={[
-          'relative min-h-0 bg-[#f8f7f4]',
-          mobilePanel === 'preview' ? 'block' : 'hidden',
-          'md:block'
-        ]}
-        aria-label="Diagram preview">
-        <View shouldShowGrid={validatedState.current.grid} />
-      </section>
-    </div>
+    {#if isMobile}
+      <div class="min-h-0 flex-1">
+        {#if mobilePanel === 'editor'}
+          {@render editorPanel()}
+        {:else}
+          {@render previewPanel()}
+        {/if}
+      </div>
+    {:else}
+      <div class="min-h-0 flex-1">
+        {#if editorOpen}
+          <Resizable.PaneGroup direction="horizontal" autoSaveId="productEditor">
+            <Resizable.Pane defaultSize={36} minSize={22}>{@render editorPanel()}</Resizable.Pane>
+            <Resizable.Handle withHandle />
+            <Resizable.Pane minSize={35}>{@render previewPanel()}</Resizable.Pane>
+          </Resizable.PaneGroup>
+        {:else}
+          {@render previewPanel()}
+        {/if}
+      </div>
+    {/if}
   {/if}
 </div>
+
+{#if diagram && role === 'owner'}
+  <ShareDialog {diagram} bind:open={shareOpen} />
+{/if}
+
+<ExportDialog
+  code={currentContent}
+  config={currentConfig}
+  getSvgElement={() => previewElement?.querySelector('#container svg') ?? null}
+  bind:open={exportOpen}
+  svgElement={exportSvgElement}
+  {title} />

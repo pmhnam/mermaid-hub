@@ -125,4 +125,81 @@ describe('ApiClient', () => {
     expect(JSON.parse(String(fetcher.mock.calls[5][1]?.body))).toEqual({ role: 'editor' });
     expect(JSON.parse(String(fetcher.mock.calls[9][1]?.body))).toEqual({ role: 'viewer' });
   });
+
+  it('uses capability authorization for public requests without cookies or auth refresh', async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      expect(new Headers(init?.headers).get('Authorization')).toBe('DiagramLink share-token');
+      expect(init?.credentials).toBe('omit');
+      return String(input).endsWith('/collaboration-ticket')
+        ? jsonResponse({
+            expiresAt: '2026-09-08T00:00:00Z',
+            role: 'viewer',
+            ticket: 'one-use',
+            websocketPath: '/ws/collaboration'
+          })
+        : jsonResponse({
+            currentConfig: '{}',
+            currentContent: 'flowchart LR',
+            id: 'diagram-1',
+            mode: 'public_read',
+            title: 'Shared',
+            updatedAt: '2026-09-08T00:00:00Z'
+          });
+    });
+    const client = new ApiClient('https://api.example', fetcher);
+
+    await client.resolvePublicDiagram('share-token');
+    await client.createPublicCollaborationTicket('share-token');
+
+    expect(fetcher.mock.calls.map(([input]) => String(input))).toEqual([
+      'https://api.example/api/public/diagram',
+      'https://api.example/api/public/diagram/collaboration-ticket'
+    ]);
+    expect(fetcher.mock.calls.some(([input]) => String(input).endsWith('/auth/refresh'))).toBe(
+      false
+    );
+  });
+
+  it('does not refresh when a public capability is rejected', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => jsonResponse({ message: 'Invalid link' }, 401));
+    const client = new ApiClient('', fetcher);
+
+    await expect(client.resolvePublicDiagram('rejected')).rejects.toMatchObject({ status: 401 });
+
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it('uses the owner public-link management contract', async () => {
+    const fetcher = vi.fn<typeof fetch>(async (_input, init) =>
+      init?.method === 'DELETE'
+        ? new Response(null, { status: 204 })
+        : jsonResponse({
+            createdAt: '2026-09-08T00:00:00Z',
+            diagramId: 'diagram-1',
+            mode: 'public_edit',
+            shareToken: 'share-token',
+            updatedAt: '2026-09-08T00:00:00Z'
+          })
+    );
+    const client = new ApiClient('https://api.example', fetcher);
+
+    await client.getPublicLink('diagram-1');
+    await client.upsertPublicLink('diagram-1', 'public_edit');
+    await client.rotatePublicLink('diagram-1');
+    await client.revokePublicLink('diagram-1');
+
+    expect(fetcher.mock.calls.map(([input]) => String(input))).toEqual([
+      'https://api.example/api/diagrams/diagram-1/public-link',
+      'https://api.example/api/diagrams/diagram-1/public-link',
+      'https://api.example/api/diagrams/diagram-1/public-link/rotate',
+      'https://api.example/api/diagrams/diagram-1/public-link'
+    ]);
+    expect(fetcher.mock.calls.map(([, init]) => init?.method)).toEqual([
+      undefined,
+      'PUT',
+      'POST',
+      'DELETE'
+    ]);
+    expect(fetcher.mock.calls[1][1]?.body).toBe('{"mode":"public_edit"}');
+  });
 });

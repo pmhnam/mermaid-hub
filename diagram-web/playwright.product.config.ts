@@ -4,6 +4,7 @@ const backendEnvironment = {
   COLLABORATION_SAVE_DEBOUNCE_MS: '2000',
   DATABASE_URL: 'postgresql://diagram:diagram@localhost:5432/diagram',
   JWT_ACCESS_SECRET: 'integration-test-secret-at-least-32-characters',
+  PUBLIC_LINK_SECRET: 'public-link-integration-secret-at-least-32-characters',
   PORT: '3001'
 };
 

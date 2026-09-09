@@ -8,6 +8,9 @@ import type {
   DiagramVersion,
   Folder,
   LoginInput,
+  PublicDiagram,
+  PublicLink,
+  PublicLinkMode,
   RegisterInput,
   ResourceMember,
   UpdateDiagramInput,
@@ -142,6 +145,35 @@ export class ApiClient {
     return this.request(`/api/diagrams/${diagramId}/collaboration-ticket`, { method: 'POST' });
   }
 
+  getPublicLink(diagramId: string): Promise<PublicLink> {
+    return this.request(`/api/diagrams/${diagramId}/public-link`);
+  }
+
+  upsertPublicLink(diagramId: string, mode: PublicLinkMode): Promise<PublicLink> {
+    return this.request(`/api/diagrams/${diagramId}/public-link`, {
+      body: JSON.stringify({ mode }),
+      method: 'PUT'
+    });
+  }
+
+  revokePublicLink(diagramId: string): Promise<void> {
+    return this.request(`/api/diagrams/${diagramId}/public-link`, { method: 'DELETE' });
+  }
+
+  rotatePublicLink(diagramId: string): Promise<PublicLink> {
+    return this.request(`/api/diagrams/${diagramId}/public-link/rotate`, { method: 'POST' });
+  }
+
+  resolvePublicDiagram(shareToken: string): Promise<PublicDiagram> {
+    return this.publicRequest('/api/public/diagram', shareToken);
+  }
+
+  createPublicCollaborationTicket(shareToken: string): Promise<CollaborationTicket> {
+    return this.publicRequest('/api/public/diagram/collaboration-ticket', shareToken, {
+      method: 'POST'
+    });
+  }
+
   getVersions(diagramId: string): Promise<DiagramVersion[]> {
     return this.request(`/api/diagrams/${diagramId}/versions`);
   }
@@ -233,12 +265,18 @@ export class ApiClient {
     }
   }
 
+  private publicRequest<T>(path: string, shareToken: string, init: RequestInit = {}): Promise<T> {
+    const headers = new Headers(init.headers);
+    headers.set('Authorization', `DiagramLink ${shareToken}`);
+    return this.fetchJson(path, { ...init, credentials: 'omit', headers });
+  }
+
   private async fetchJson<T>(path: string, init: RequestInit): Promise<T> {
     const headers = new Headers(init.headers);
     if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     const response = await this.fetcher(`${this.baseUrl}${path}`, {
       ...init,
-      credentials: 'include',
+      credentials: init.credentials ?? 'include',
       headers
     });
     if (!response.ok) throw await responseError(response);
