@@ -3,6 +3,8 @@
 **/.svelte-kit
 **/dist
 **/docs
+**/.env
+**/.env.local
 
 **/.github
 **/.husky

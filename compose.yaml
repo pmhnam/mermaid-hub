@@ -18,7 +18,7 @@ services:
 
   api:
     build:
-      context: ../diagram-api
+      context: ./diagram-api
     restart: unless-stopped
     environment:
       COOKIE_SECURE: "true"
@@ -47,7 +47,7 @@ services:
 
   web:
     build:
-      context: ../diagram-web
+      context: ./diagram-web
       target: mermaid
     container_name: mermaid-workspace-web
     restart: unless-stopped
