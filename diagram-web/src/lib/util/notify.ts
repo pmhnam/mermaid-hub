@@ -1,7 +1,7 @@
-import { toast } from 'svelte-sonner';
+import { toast, type ExternalToast } from 'svelte-sonner';
 
-export const notify = (message: string): void => {
-  toast(message);
+export const notify = (message: string, options?: ExternalToast): void => {
+  toast(message, options);
 };
 
 export const prompt = (message: string): boolean => {

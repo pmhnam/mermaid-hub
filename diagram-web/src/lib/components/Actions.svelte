@@ -20,6 +20,8 @@
   import ExternalLinkIcon from '~icons/material-symbols/open-in-new-rounded';
   import WidthIcon from '~icons/material-symbols/width-rounded';
 
+  let { mobile = false }: { mobile?: boolean } = $props();
+
   const FONT_AWESOME_URL = `https://cdnjs.cloudflare.com/ajax/libs/font-awesome/${FAVersion}/css/all.min.css`;
 
   type Exporter = (context: CanvasRenderingContext2D, image: HTMLImageElement) => () => void;
@@ -267,9 +269,13 @@ ${svgString}`);
   </div>
 {/snippet}
 
-<Card title="Actions" isStackable icon={{ component: DownloadIcon, class: 'rotate-180' }}>
-  <div class="flex min-w-fit flex-col gap-2 p-2">
-    <div class="flex w-full items-center gap-2 py-2 whitespace-nowrap">
+<Card
+  title="Actions"
+  isOpen={mobile}
+  isStackable={!mobile}
+  icon={{ component: DownloadIcon, class: 'rotate-180' }}>
+  <div class="flex min-w-0 flex-col gap-2 p-2">
+    <div class="flex w-full flex-wrap items-center gap-2 py-2">
       PNG size
       <ToggleGroup.Root type="single" variant="outline" bind:value={imageSizeMode}>
         <ToggleGroup.Item value="auto">Auto</ToggleGroup.Item>
@@ -285,9 +291,10 @@ ${svgString}`);
         min="3"
         max="10000"
         disabled={imageSizeMode === 'auto'}
+        class="min-w-20 flex-1"
         bind:value={imageSize} />
     </div>
-    <div class="flex gap-2">
+    <div class="flex flex-wrap gap-2">
       {@render dualActionButton('PNG', onDownloadPNG, urls.current.png)}
       {@render dualActionButton('SVG', onDownloadSVG, urls.current.svg)}
       <ExternalLinkWrapper domain={getDomain(urls.current.kroki)} isVisible={!!urls.current.kroki}>
@@ -308,8 +315,8 @@ ${svgString}`);
       isVisible={!!urls.current.mdCode}>
       <CopyInput value={urls.current.mdCode} label="Copy Markdown" testID={TID.copyMarkdown} />
     </ExternalLinkWrapper>
-    <div class="flex w-full items-center gap-2">
-      <Input type="url" bind:value={gistURL} placeholder="Enter Gist URL" />
+    <div class="flex w-full flex-wrap items-center gap-2">
+      <Input class="min-w-0 flex-1" type="url" bind:value={gistURL} placeholder="Enter Gist URL" />
       <Button onclick={loadGist}>Load Gist</Button>
     </div>
     {#if isNetlify}

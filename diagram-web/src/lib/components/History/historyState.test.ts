@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addAutoEntry,
   addManualEntry,
+  checkpointCurrentState,
   clearActive,
   historyState,
   injectHistoryIDs,
@@ -134,6 +135,29 @@ describe('addAutoEntry', () => {
     const entries = entriesFor('auto');
     expect(entries).toHaveLength(30);
     expect(entries[0].state.code).toBe('graph TD\n A-->B34');
+  });
+});
+
+describe('checkpointCurrentState', () => {
+  it('stores and returns a detached full input snapshot', () => {
+    replaceInputState({
+      ...defaultState,
+      code: 'graph TD\n before',
+      mermaid: '{"theme":"dark"}',
+      pan: { x: 4, y: 8 },
+      zoom: 1.5
+    });
+
+    const snapshot = checkpointCurrentState();
+    replaceInputState({ ...defaultState, code: 'graph TD\n after' });
+
+    expect(snapshot).toMatchObject({
+      code: 'graph TD\n before',
+      mermaid: '{"theme":"dark"}',
+      pan: { x: 4, y: 8 },
+      zoom: 1.5
+    });
+    expect(entriesFor('auto')[0].state.code).toBe('graph TD\n before');
   });
 });
 

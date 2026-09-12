@@ -22,6 +22,7 @@
   import {
     addManualEntry,
     clearActive,
+    checkpointCurrentState,
     historyState,
     removeEntry,
     renameEntry,
@@ -112,7 +113,15 @@
   };
 
   const restoreHistoryItem = (state: State): void => {
+    const previous = checkpointCurrentState();
     replaceInputState({ ...state, updateDiagram: true });
+    notify('History entry restored.', {
+      action: {
+        label: 'Undo',
+        onClick: () => replaceInputState({ ...previous, updateDiagram: true })
+      },
+      duration: 8000
+    });
   };
 
   // Absolute editor URL for an entry, so the link can be opened in a new tab or copied.

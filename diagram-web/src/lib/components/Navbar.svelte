@@ -21,11 +21,12 @@
 
   interface Props {
     mobileToggle?: Snippet;
+    mobileActions?: Snippet;
     children: Snippet;
     hidePromotion?: boolean;
   }
 
-  let { children, mobileToggle, hidePromotion = false }: Props = $props();
+  let { children, mobileActions, mobileToggle, hidePromotion = false }: Props = $props();
 
   type Links = ComponentProps<typeof DropdownNavMenu>['links'];
 
@@ -92,10 +93,11 @@
   </div>
   <div
     id="menu"
-    class="hidden flex-nowrap items-center justify-between gap-3 overflow-hidden md:flex">
+    class="hidden flex-nowrap items-center justify-between gap-3 overflow-hidden sm:flex">
     <DropdownNavMenu icon={GithubIcon} links={githubLinks} />
     <Separator orientation="vertical" />
     {@render children()}
   </div>
+  {@render mobileActions?.()}
   {@render mobileToggle?.()}
 </nav>

@@ -85,6 +85,15 @@ export const addManualEntry = (state: State): boolean => addEntry(manual, state,
 export const addAutoEntry = (state: State): boolean =>
   addEntry(auto, state, 'auto', MAX_AUTO_HISTORY_LENGTH);
 
+// Capture the full state before a destructive replacement. The returned
+// snapshot is also used by the transient Undo action, even when Timeline
+// deduplicates the entry.
+export const checkpointCurrentState = (): State => {
+  const snapshot = $state.snapshot(inputState) as State;
+  addAutoEntry(snapshot);
+  return snapshot;
+};
+
 // Replaces the in-memory revisions (e.g. when a gist is loaded), assigning ids.
 export const setLoaderEntries = (entries: Optional<HistoryEntry, 'id'>[]): void => {
   loader = entries.map((entry) =>

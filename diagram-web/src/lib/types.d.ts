@@ -43,6 +43,8 @@ export interface ValidatedState extends State {
   editorMode: EditorMode;
   diagramType?: string;
   error?: Error;
+  errorRange?: SourceRange;
+  errorSource?: 'code' | 'config';
   errorMarkers: MarkerData[];
   serialized: string;
 }

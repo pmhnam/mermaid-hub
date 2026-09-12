@@ -3,7 +3,9 @@
   import { Button, buttonVariants } from '$/components/ui/button';
   import * as Popover from '$/components/ui/popover';
   import { getSampleDiagrams, type SampleExample } from '$/util/mermaid';
-  import { updateCode } from '$lib/util/state.svelte';
+  import { checkpointCurrentState } from '$/components/History/historyState.svelte';
+  import { notify } from '$lib/util/notify';
+  import { replaceInputState, updateCode } from '$lib/util/state.svelte';
   import { logEvent } from '$lib/util/stats';
   import { cn } from '$lib/utils';
   import ShapesIcon from '~icons/material-symbols/account-tree-outline-rounded';
@@ -45,9 +47,17 @@
   const samples = { ...getSampleDiagrams(), ...extras };
 
   const loadSampleDiagram = (diagramType: string, example: SampleExample): void => {
+    const previous = checkpointCurrentState();
     updateCode(example.code, {
       resetPanZoom: true,
       updateDiagram: true
+    });
+    notify('Sample diagram loaded.', {
+      action: {
+        label: 'Undo',
+        onClick: () => replaceInputState({ ...previous, updateDiagram: true })
+      },
+      duration: 8000
     });
     logEvent('loadSampleDiagram', { diagramType, exampleTitle: example.title });
   };

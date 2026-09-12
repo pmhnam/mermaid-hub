@@ -1,5 +1,5 @@
 import { defaultState } from '$/constants';
-import type { ErrorHash, MarkerData, State, ValidatedState } from '$/types';
+import type { State, ValidatedState } from '$/types';
 import { resolve } from '$app/paths';
 import { debounce, get as lodashGet } from 'lodash-es';
 import type { MermaidConfig } from 'mermaid';
@@ -8,7 +8,8 @@ import { env } from './env';
 import {
   extractErrorLineText,
   findMostRelevantLineNumber,
-  replaceLineNumberInErrorMessage
+  replaceLineNumberInErrorMessage,
+  sourceRangeFromError
 } from './errorHandling';
 import { parse } from './mermaid';
 import { readJSON, writeJSON } from './persist.svelte';
@@ -58,7 +59,6 @@ let lastDiagramType = '';
 
 const processState = async (state: State) => {
   const processed = validatedStateOf(state, '');
-  // No changes should be done to fields part of `state`.
   try {
     processed.serialized = serializeState(state);
     const { diagramType } = await parse(state.code);
@@ -68,52 +68,54 @@ const processState = async (state: State) => {
       setTimeout(() => window.location.reload(), 500);
     }
     lastDiagramType = diagramType;
+  } catch (error) {
+    processed.error = error as Error;
+    processed.errorSource = 'code';
+    errorDebug();
+    console.error(error);
+    const errorString = processed.error.toString();
+    const errorLineText = extractErrorLineText(errorString);
+    const realLineNumber = findMostRelevantLineNumber(errorLineText, state.code);
+    if (realLineNumber !== -1) {
+      processed.error = new Error(replaceLineNumberInErrorMessage(errorString, realLineNumber));
+    }
+    processed.errorRange = sourceRangeFromError(error, state.code, processed.error.message);
+    if (processed.errorRange) {
+      const startLine = state.code.slice(0, processed.errorRange.start).split('\n').length;
+      const endLine = state.code.slice(0, processed.errorRange.end).split('\n').length;
+      processed.errorMarkers = [
+        {
+          endColumn:
+            processed.errorRange.end - state.code.lastIndexOf('\n', processed.errorRange.end - 1),
+          endLineNumber: endLine,
+          message: processed.error.message || 'Syntax error',
+          severity: 8,
+          startColumn:
+            processed.errorRange.start -
+            state.code.lastIndexOf('\n', processed.errorRange.start - 1),
+          startLineNumber: startLine
+        }
+      ];
+    }
+  }
+
+  if (processed.errorSource === 'code') {
+    return processed;
+  }
+
+  try {
     JSON.parse(state.mermaid);
   } catch (error) {
     processed.error = error as Error;
-    errorDebug();
+    processed.errorSource = 'config';
     console.error(error);
-    if (error && typeof error === 'object' && 'hash' in error) {
-      try {
-        let errorString = processed.error.toString();
-        const errorLineText = extractErrorLineText(errorString);
-        const realLineNumber = findMostRelevantLineNumber(errorLineText, state.code);
-
-        let first_line: number, last_line: number, first_column: number, last_column: number;
-        try {
-          ({ first_line, last_line, first_column, last_column } = (error.hash as ErrorHash).loc);
-        } catch {
-          const lineNo = findMostRelevantLineNumber(errorString, state.code);
-          first_line = lineNo;
-          last_line = lineNo + 1;
-          first_column = 0;
-          last_column = 0;
-        }
-
-        if (realLineNumber !== -1) {
-          errorString = replaceLineNumberInErrorMessage(errorString, realLineNumber);
-        }
-
-        processed.error = new Error(errorString);
-        const marker: MarkerData = {
-          endColumn: last_column + (first_column === last_column ? 0 : 5),
-          endLineNumber: last_line + (realLineNumber - first_line),
-          message: errorString || 'Syntax error',
-          severity: 8, // Error
-          startColumn: first_column,
-          startLineNumber: realLineNumber
-        };
-        processed.errorMarkers = [marker];
-      } catch (error) {
-        console.error('Error without line helper', error);
-      }
-    }
   }
   return processed;
 };
 
 // Replaces the old URL-hash store subscription; assigned by initURLSubscription.
 let updateHash: ReturnType<typeof debounce> | undefined;
+let processRevision = 0;
 
 // Persist the current input state and asynchronously re-validate it,
 // publishing the result to `validatedState` (and the URL hash, once
@@ -122,7 +124,9 @@ let updateHash: ReturnType<typeof debounce> | undefined;
 const persistAndProcess = (): void => {
   const snapshot = $state.snapshot(input) as State;
   writeJSON(CODE_STORE_KEY, snapshot);
+  const revision = ++processRevision;
   void processState(snapshot).then((processed) => {
+    if (revision !== processRevision) return;
     validatedCurrent = processed;
     updateHash?.(processed.serialized);
   });

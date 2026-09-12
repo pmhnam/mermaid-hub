@@ -11,7 +11,9 @@
   import Preset from '$/components/Preset.svelte';
   import Share from '$/components/Share.svelte';
   import SyncRoughToolbar from '$/components/SyncRoughToolbar.svelte';
-  import { Button } from '$/components/ui/button';
+  import { Button, buttonVariants } from '$/components/ui/button';
+  import * as Dialog from '$/components/ui/dialog';
+  import * as Popover from '$/components/ui/popover';
   import * as Resizable from '$/components/ui/resizable';
   import { Switch } from '$/components/ui/switch';
   import { Toggle } from '$/components/ui/toggle';
@@ -26,6 +28,7 @@
   import CodeIcon from '~icons/custom/code';
   import HistoryIcon from '~icons/material-symbols/history';
   import GearIcon from '~icons/material-symbols/settings-outline-rounded';
+  import MoreIcon from '~icons/material-symbols/more-horiz';
 
   const panZoomState = new PanZoomState();
 
@@ -70,6 +73,10 @@
   onMount(() => startAutoSave());
 
   let isHistoryOpen = $state(false);
+  let isMobileActionsOpen = $state(false);
+  let isMobileHistoryOpen = $state(false);
+  let isMobileMenuOpen = $state(false);
+  let isShareOpen = $state(false);
 
   let editorPane: Resizable.Pane | undefined;
   $effect(() => {
@@ -92,11 +99,47 @@
     </div>
   {/snippet}
 
-  <Navbar mobileToggle={isMobile ? mobileToggle : undefined}>
+  {#snippet mobileActions()}
+    <div class="flex items-center gap-1 sm:hidden">
+      <Button variant="accent" size="sm" href={urls.current.workspaceImport}>Save</Button>
+      <Popover.Root bind:open={isMobileMenuOpen}>
+        <Popover.Trigger
+          class={buttonVariants({ size: 'icon', variant: 'ghost' })}
+          aria-label="More editor actions">
+          <MoreIcon />
+        </Popover.Trigger>
+        <Popover.Content align="end" class="flex w-52 flex-col gap-1 p-1">
+          <Button
+            variant="ghost"
+            class="justify-start"
+            onclick={() => {
+              isMobileMenuOpen = false;
+              isShareOpen = true;
+            }}>Share</Button>
+          <Button
+            variant="ghost"
+            class="justify-start"
+            onclick={() => {
+              isMobileMenuOpen = false;
+              isMobileHistoryOpen = true;
+            }}>History</Button>
+          <Button
+            variant="ghost"
+            class="justify-start"
+            onclick={() => {
+              isMobileMenuOpen = false;
+              isMobileActionsOpen = true;
+            }}>Actions</Button>
+        </Popover.Content>
+      </Popover.Root>
+    </div>
+  {/snippet}
+
+  <Navbar {mobileActions} mobileToggle={isMobile ? mobileToggle : undefined}>
     <Toggle bind:pressed={isHistoryOpen} size="sm" title="History" aria-label="History">
       <HistoryIcon />
     </Toggle>
-    <Share />
+    <Share showTrigger={!isMobile} bind:open={isShareOpen} />
     <Button variant="accent" size="sm" href={urls.current.workspaceImport}>
       Save to workspace
     </Button>
@@ -128,7 +171,9 @@
 
             <div class="group flex flex-wrap justify-between gap-4 sm:gap-6">
               <Preset />
-              <Actions />
+              {#if !isMobile}
+                <Actions />
+              {/if}
             </div>
           </div>
         </Resizable.Pane>
@@ -155,3 +200,25 @@
     </div>
   </div>
 </div>
+
+<Dialog.Root bind:open={isMobileHistoryOpen}>
+  <Dialog.Content class="flex max-h-[90vh] flex-col sm:hidden">
+    <Dialog.Header>
+      <Dialog.Title>History</Dialog.Title>
+      <Dialog.Description>Restore a saved diagram or browse the Timeline.</Dialog.Description>
+    </Dialog.Header>
+    <div class="h-[60vh] min-h-0">
+      <History />
+    </div>
+  </Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={isMobileActionsOpen}>
+  <Dialog.Content class="max-h-[90vh] overflow-y-auto sm:hidden">
+    <Dialog.Header>
+      <Dialog.Title>Actions</Dialog.Title>
+      <Dialog.Description>Export, copy, or load this diagram.</Dialog.Description>
+    </Dialog.Header>
+    <Actions mobile />
+  </Dialog.Content>
+</Dialog.Root>

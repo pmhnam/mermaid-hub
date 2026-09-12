@@ -7,6 +7,7 @@
   import { updateCodeStore, validatedState } from '$/util/state.svelte';
   import { saveStatistics } from '$/util/stats';
   import { annotateSvgSourceNavigation, sourceRangeForSvgTarget } from '$lib/util/sourceNavigation';
+  import PreviewErrorOverlay from './PreviewErrorOverlay.svelte';
   import FontAwesome, { mayContainFontAwesome } from '$lib/components/FontAwesome.svelte';
   import uniqueID from 'lodash-es/uniqueId';
   import type { MermaidConfig } from 'mermaid';
@@ -27,7 +28,9 @@
   let container: HTMLDivElement | undefined = $state();
   let rough: boolean;
   let view: HTMLDivElement | undefined = $state();
-  let error = $state(false);
+  let error = $state<Error | undefined>();
+  let errorTimer: ReturnType<typeof setTimeout> | undefined;
+  let hasRenderedDiagram = $state(false);
   let panZoom = true;
   let manualUpdate = true;
   let renderedDiagramType = '';
@@ -51,10 +54,15 @@
   const handleStateChange = async (state: ValidatedState) => {
     const startTime = Date.now();
     if (state.error !== undefined) {
-      error = true;
+      if (errorTimer) clearTimeout(errorTimer);
+      const nextError = state.error;
+      errorTimer = setTimeout(() => {
+        error = nextError;
+      }, 1000);
       return;
     }
-    error = false;
+    if (errorTimer) clearTimeout(errorTimer);
+    error = undefined;
     let diagramType: string | undefined;
     try {
       if (container) {
@@ -73,24 +81,28 @@
           return;
         }
 
-        code = state.code;
-        config = state.mermaid;
-        rough = state.rough;
-        panZoom = state.panZoom ?? true;
+        const nextCode = state.code;
+        const nextConfig = state.mermaid;
+        const nextPanZoom = state.panZoom ?? true;
 
-        if (mayContainFontAwesome(code)) {
+        if (mayContainFontAwesome(nextCode)) {
           await waitForFontAwesomeToLoad?.();
         }
 
         const scroll = view?.parentElement?.scrollTop;
         const { diagramType: detectedDiagramType, graphDiv } = await renderAndPlaceDiagram({
-          code,
-          config: JSON.parse(state.mermaid) as MermaidConfig,
+          code: nextCode,
+          config: JSON.parse(nextConfig) as MermaidConfig,
           container,
           rough: state.rough,
           viewId: uniqueID('graph-')
         });
         diagramType = detectedDiagramType;
+        code = nextCode;
+        config = nextConfig;
+        rough = state.rough;
+        panZoom = nextPanZoom;
+        hasRenderedDiagram = true;
         renderedDiagramType = detectedDiagramType ?? '';
         if (graphDiv && detectedDiagramType) {
           annotateSvgSourceNavigation(code, detectedDiagramType, graphDiv);
@@ -101,13 +113,13 @@
         if (view?.parentElement && scroll) {
           view.parentElement.scrollTop = scroll;
         }
-        error = false;
+        error = undefined;
       } else if (manualUpdate) {
         manualUpdate = false;
       }
     } catch (error_) {
       console.error('view fail', error_);
-      error = true;
+      error = error_ instanceof Error ? error_ : new Error(String(error_));
     }
     const renderTime = Date.now() - startTime;
     saveStatistics({ code, diagramType, isRough: state.rough, renderTime });
@@ -145,8 +157,17 @@
   role="application"
   aria-label="Interactive diagram preview"
   ondblclick={handleDoubleClick}
-  class={['h-full w-full', shouldShowGrid && `grid-bg-${mode.current}`, error && 'opacity-50']}>
+  class={['relative h-full w-full', shouldShowGrid && `grid-bg-${mode.current}`]}>
   <div id="container" bind:this={container} class="h-full overflow-auto"></div>
+  {#if error}
+    <PreviewErrorOverlay
+      {error}
+      hasPreviousDiagram={hasRenderedDiagram}
+      onSourceSelect={error && validatedState.current.errorSource === 'code'
+        ? onSourceSelect
+        : undefined}
+      range={validatedState.current.errorRange} />
+  {/if}
 </div>
 
 <style>

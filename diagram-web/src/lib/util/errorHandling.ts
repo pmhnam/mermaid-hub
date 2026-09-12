@@ -1,3 +1,5 @@
+import type { ErrorHash, SourceRange } from '$/types';
+
 // Function to find the line number with the most characters in common with the error
 export function findMostRelevantLineNumber(errorLineText: string, code: string): number {
   const codeLines = code.split('\n');
@@ -44,4 +46,57 @@ export function extractErrorLineText(errorMessage: string): string {
   const regexLex = /Error: Lexical error on line \d+. Unrecognized text.\n(.+)\n-+/;
   const matchLex = errorMessage.match(regexLex);
   return matchLex ? matchLex[1].slice(3) : '';
+}
+
+const lineOffsets = (code: string): number[] => {
+  const offsets = [0];
+  for (let index = code.indexOf('\n'); index !== -1; index = code.indexOf('\n', index + 1)) {
+    offsets.push(index + 1);
+  }
+  return offsets;
+};
+
+const clamp = (value: number, minimum: number, maximum: number): number =>
+  Math.min(Math.max(value, minimum), maximum);
+
+/** Convert Mermaid's 1-based lines and 0-based columns to source offsets. */
+export function sourceRangeFromError(
+  error: unknown,
+  code: string,
+  errorMessage: string
+): SourceRange | undefined {
+  const lines = code.split('\n');
+  const offsets = lineOffsets(code);
+  const hash = error && typeof error === 'object' && 'hash' in error ? error.hash : undefined;
+  const location = (hash as ErrorHash | undefined)?.loc;
+  const hasLocation = location !== undefined;
+  const reportedLine = location?.first_line;
+  const relevantLine = findMostRelevantLineNumber(extractErrorLineText(errorMessage), code);
+  const firstLine = clamp(relevantLine > 0 ? relevantLine : (reportedLine ?? 1), 1, lines.length);
+  const lineDelta = reportedLine && relevantLine > 0 ? firstLine - reportedLine : 0;
+  const lastLine = clamp(
+    (location?.last_line ?? reportedLine ?? firstLine) + lineDelta,
+    firstLine,
+    lines.length
+  );
+  const firstColumn = clamp(
+    !hasLocation || (relevantLine > 0 && reportedLine !== relevantLine)
+      ? 0
+      : (location?.first_column ?? 0),
+    0,
+    lines[firstLine - 1].replace(/\r$/, '').length
+  );
+  const lastColumn = clamp(
+    relevantLine > 0 && reportedLine !== relevantLine
+      ? lines[lastLine - 1].replace(/\r$/, '').length
+      : !hasLocation
+        ? lines[lastLine - 1].replace(/\r$/, '').length
+        : (location?.last_column ?? firstColumn + 1),
+    firstColumn + 1,
+    lines[lastLine - 1].replace(/\r$/, '').length || firstColumn + 1
+  );
+  const start = offsets[firstLine - 1] + firstColumn;
+  const end = Math.max(start + 1, offsets[lastLine - 1] + lastColumn);
+
+  return { end: Math.min(end, code.length), start: Math.min(start, code.length) };
 }

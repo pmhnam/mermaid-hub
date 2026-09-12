@@ -17,6 +17,14 @@
   import CopyButton from './CopyButton.svelte';
   import CopyInput from './CopyInput.svelte';
 
+  let {
+    open = $bindable(false),
+    showTrigger = true
+  }: {
+    open?: boolean;
+    showTrigger?: boolean;
+  } = $props();
+
   const sanitizedConfig = $derived(silentlySanitizeConfig(validatedState.current.mermaid));
   // Deliberate initial-value capture: the embed form seeds from the config at
   // mount time and then owns its values.
@@ -51,8 +59,10 @@
   const snippet = $derived(format === 'webComponent' ? snippets.webComponent : snippets.iframe);
 </script>
 
-<Dialog.Root>
-  <Dialog.Trigger class={buttonVariants({ size: 'sm' })}>Share</Dialog.Trigger>
+<Dialog.Root bind:open>
+  {#if showTrigger}
+    <Dialog.Trigger class={buttonVariants({ size: 'sm' })}>Share</Dialog.Trigger>
+  {/if}
   <Dialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-xl">
     <Dialog.Header>
       <Dialog.Title class="flex items-center gap-2 text-xl">
