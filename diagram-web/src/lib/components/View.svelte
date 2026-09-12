@@ -6,7 +6,7 @@
   import { renderAndPlaceDiagram } from '$/util/renderView';
   import { updateCodeStore, validatedState } from '$/util/state.svelte';
   import { saveStatistics } from '$/util/stats';
-  import { sourceRangeForSvgTarget } from '$lib/util/sourceNavigation';
+  import { annotateSvgSourceNavigation, sourceRangeForSvgTarget } from '$lib/util/sourceNavigation';
   import FontAwesome, { mayContainFontAwesome } from '$lib/components/FontAwesome.svelte';
   import uniqueID from 'lodash-es/uniqueId';
   import type { MermaidConfig } from 'mermaid';
@@ -92,6 +92,9 @@
         });
         diagramType = detectedDiagramType;
         renderedDiagramType = detectedDiagramType ?? '';
+        if (graphDiv && detectedDiagramType) {
+          annotateSvgSourceNavigation(code, detectedDiagramType, graphDiv);
+        }
         if (graphDiv && state.panZoom) {
           handlePanZoom(state, graphDiv);
         }
