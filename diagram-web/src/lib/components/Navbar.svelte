@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  import { logEvent, logMermaidChartClick } from '$lib/util/stats';
+  import { logEvent } from '$lib/util/stats';
   import { version } from 'mermaid/package.json';
 
   void logEvent('version', {
@@ -50,7 +50,6 @@
     logEvent('bannerClick', {
       promotion: activePromotion.id
     });
-    logMermaidChartClick('banner');
   };
 </script>
 

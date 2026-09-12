@@ -1,7 +1,13 @@
 import { defaultState } from '$/constants';
 import type { State } from '$/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildEditUrl, resolveEmbedSettings, serializeEmbedState, toggleMode } from './embed';
+import {
+  buildEditUrl,
+  buildSaveUrl,
+  resolveEmbedSettings,
+  serializeEmbedState,
+  toggleMode
+} from './embed';
 import { deserializeState, serializeState } from './serde';
 
 const embedUrl = (state?: Partial<State>, params?: Record<string, string>): URL => {
@@ -179,5 +185,13 @@ describe('buildEditUrl', () => {
     expect(state.code).toBe('graph TD\n  A-->B');
     expect(state.panZoom).toBe(true);
     expect(JSON.parse(state.mermaid)).toMatchObject({ securityLevel: 'strict', theme: 'forest' });
+  });
+});
+
+describe('buildSaveUrl', () => {
+  it('points to the internal workspace import route', () => {
+    expect(buildSaveUrl('pako:diagram', 'https://example.test/import')).toBe(
+      'https://example.test/import#pako:diagram'
+    );
   });
 });

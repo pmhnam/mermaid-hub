@@ -20,12 +20,6 @@ export const TID = {
   themeToggleButton: 'theme-toggle-button'
 } as const;
 
-export const C = {
-  aiLiveEditor: 'ai_live_editor',
-  editorChooserDismissedKey: 'mermaid-editor-chooser-dismissed',
-  utmSource: 'mermaid_live_editor'
-} as const;
-
 export const MERMAID_THEMES = [
   'default',
   'neutral',

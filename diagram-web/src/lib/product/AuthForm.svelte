@@ -16,25 +16,33 @@
   let error = $state('');
   let submitting = $state(false);
 
-  interface ProductDestination {
-    workspaceId: string;
-    diagramId?: string;
-  }
+  type ProductDestination =
+    | { diagramId?: string; kind: 'workspace'; workspaceId: string }
+    | { kind: 'import'; state: string };
 
   const productDestination = (value: string | null): ProductDestination | null => {
     if (!value) return null;
-    const pathname = value.slice(base.length);
+    const destination = new URL(value, window.location.origin);
+    if (destination.origin !== window.location.origin) return null;
+    const pathWithoutBase = destination.pathname.slice(base.length);
+    const pathname = pathWithoutBase.startsWith('/') ? pathWithoutBase : `/${pathWithoutBase}`;
     const diagramMatch = /^\/workspace\/([^/]+)\/diagram\/([^/]+)$/.exec(pathname);
     if (diagramMatch) {
-      return { diagramId: diagramMatch[2], workspaceId: diagramMatch[1] };
+      return { diagramId: diagramMatch[2], kind: 'workspace', workspaceId: diagramMatch[1] };
     }
     const workspaceMatch = /^\/workspace\/([^/]+)$/.exec(pathname);
-    return workspaceMatch ? { workspaceId: workspaceMatch[1] } : null;
+    if (workspaceMatch) return { kind: 'workspace', workspaceId: workspaceMatch[1] };
+    if (pathname === '/import') return { kind: 'import', state: destination.hash.slice(1) };
+    return null;
   };
 
   const continueToProduct = async (): Promise<void> => {
     const redirect = productDestination(page.url.searchParams.get('redirect'));
-    if (redirect) {
+    if (redirect?.kind === 'import') {
+      await goto(`${base}/import${redirect.state ? `#${redirect.state}` : ''}`);
+      return;
+    }
+    if (redirect?.kind === 'workspace') {
       await goto(
         redirect.diagramId
           ? resolve('/workspace/[workspaceId]/diagram/[diagramId]', {

@@ -1,7 +1,6 @@
 <script lang="ts">
   import { Button } from '$/components/ui/button';
-  import { C } from '$/constants';
-  import { MCBaseURL } from '$/util/util';
+  import { resolve } from '$app/paths';
   import { onDestroy, type Snippet } from 'svelte';
   import { fade } from 'svelte/transition';
 
@@ -13,36 +12,12 @@
 
   interface Taglines {
     label: string;
-    url: {
-      path: string;
-      params: Record<string, string>;
-    };
   }
 
-  const commonParams = { utm_source: C.utmSource, utm_medium: 'banner_ad' } as const;
-
   let taglines: Taglines[] = [
-    {
-      label: 'Replace ChatGPT Pro, Mermaid.live, and Lucid Chart with Mermaid Chart',
-      url: {
-        path: '/mermaid-ai',
-        params: { utm_campaign: 'aibundle' }
-      }
-    },
-    {
-      label: 'Diagram live with teammates in Mermaid Chart',
-      url: {
-        path: '/landing',
-        params: { utm_campaign: 'team_collaboration' }
-      }
-    },
-    {
-      label: 'Customize your layout and design in Mermaid Chart’s visual editor!',
-      url: {
-        path: '/whiteboard',
-        params: { utm_campaign: 'visual_editor' }
-      }
-    }
+    { label: 'Save and organize your diagrams in Mermaid Workspace' },
+    { label: 'Collaborate with your team in Mermaid Workspace' },
+    { label: 'Keep your diagrams available across devices' }
   ];
 
   const getRandomIndex = (array: unknown[]) => Math.floor(Math.random() * array.length);
@@ -61,12 +36,7 @@
     clearInterval(interval);
   });
 
-  const taglineHref = $derived(
-    `${MCBaseURL}${currentTagline.url.path}?${new URLSearchParams({
-      ...commonParams,
-      ...currentTagline.url.params
-    }).toString()}`
-  );
+  const taglineHref = resolve('/register', {});
 </script>
 
 <div
@@ -78,8 +48,6 @@
     {#key currentTagline}
       <a
         href={taglineHref}
-        target="_blank"
-        rel="noopener noreferrer"
         class="col-start-1 row-start-1 flex items-center justify-center gap-4 no-underline"
         in:fade={{ delay: 800 }}
         out:fade={{ duration: 1000 }}>

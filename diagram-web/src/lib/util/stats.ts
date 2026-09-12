@@ -130,7 +130,3 @@ export const logEvent = (
     window.setTimeout(() => timeouts.delete(key), delaysPerEvent[name])
   );
 };
-
-export const logMermaidChartClick = (source: string): void => {
-  logEvent('mermaidChartClick', { source });
-};
