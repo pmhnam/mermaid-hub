@@ -94,8 +94,25 @@ export class CollaborativeDocumentController {
     });
   }
 
-  setConfigAndVisualLayout(config: string, layout: VisualLayout | undefined): void {
+  setDocumentAndVisualLayout(code: string, config: string, layout: VisualLayout | undefined): void {
     this.doc.transact(() => {
+      const currentCode = this.code.toString();
+      if (currentCode !== code) {
+        let start = 0;
+        while (start < currentCode.length && currentCode[start] === code[start]) start++;
+        let currentEnd = currentCode.length;
+        let nextEnd = code.length;
+        while (
+          currentEnd > start &&
+          nextEnd > start &&
+          currentCode[currentEnd - 1] === code[nextEnd - 1]
+        ) {
+          currentEnd--;
+          nextEnd--;
+        }
+        this.code.delete(start, currentEnd - start);
+        this.code.insert(start, code.slice(start, nextEnd));
+      }
       this.config.delete(0, this.config.length);
       this.config.insert(0, config);
       if (!layout) {

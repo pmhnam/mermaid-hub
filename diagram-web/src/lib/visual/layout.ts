@@ -1,4 +1,5 @@
 import type { MermaidConfig } from 'mermaid';
+import { isAlias, isScalar, parseDocument } from 'yaml';
 
 export type LayoutEngine = 'dagre' | 'elk';
 
@@ -11,6 +12,12 @@ export interface VisualLayout {
   engine: LayoutEngine;
   mode: 'auto' | 'manual';
   offsets: Record<string, VisualLayoutOffset>;
+}
+
+interface FrontmatterLayout {
+  end: number;
+  engine: LayoutEngine;
+  start: number;
 }
 
 const supportedDiagramTypes = ['class', 'er', 'flowchart', 'requirement', 'state'];
@@ -28,6 +35,36 @@ export const layoutEngineFromConfig = (config: string | MermaidConfig): LayoutEn
   }
 };
 
+const frontmatterLayout = (code: string): FrontmatterLayout | undefined => {
+  const frontmatter = code.match(
+    /^([^\S\n\r]*)(---[^\S\n\r]*\r?\n)([\s\S]*?)(\r?\n\1---[^\S\n\r]*(?=\r?\n|$))/
+  );
+  const body = frontmatter?.[3];
+  if (!frontmatter || body === undefined) return undefined;
+
+  const bodyStart = frontmatter[1].length + frontmatter[2].length;
+  const document = parseDocument(body);
+  if (document.errors.length > 0) return undefined;
+  const layout = document.getIn(['config', 'layout'], true);
+  if ((!isScalar(layout) && !isAlias(layout)) || !layout.range) return undefined;
+  const resolvedLayout = isAlias(layout) ? layout.resolve(document) : layout;
+  const engine =
+    isScalar(resolvedLayout) && typeof resolvedLayout.value === 'string'
+      ? resolvedLayout.value.toLowerCase()
+      : '';
+  if (engine !== 'dagre' && engine !== 'elk') return undefined;
+  return {
+    end: bodyStart + layout.range[1],
+    engine,
+    start: bodyStart + layout.range[0]
+  };
+};
+
+export const layoutEngineFromDocument = (
+  code: string,
+  config: string | MermaidConfig
+): LayoutEngine => frontmatterLayout(code)?.engine ?? layoutEngineFromConfig(config);
+
 export const updateMermaidLayout = (configText: string, engine: LayoutEngine): string | null => {
   try {
     const parsed = configText.trim() ? JSON.parse(configText) : {};
@@ -40,6 +77,24 @@ export const updateMermaidLayout = (configText: string, engine: LayoutEngine): s
   } catch {
     return null;
   }
+};
+
+export const updateMermaidDocumentLayout = (
+  code: string,
+  configText: string,
+  engine: LayoutEngine
+): { code: string; config: string } | null => {
+  const config = updateMermaidLayout(configText, engine);
+  if (!config) return null;
+  const layout = frontmatterLayout(code);
+  const currentValue = layout ? code.slice(layout.start, layout.end) : '';
+  const quote = currentValue.match(/^(["']).*\1$/s)?.[1] ?? '';
+  return {
+    code: layout
+      ? `${code.slice(0, layout.start)}${quote}${engine}${quote}${code.slice(layout.end)}`
+      : code,
+    config
+  };
 };
 
 export const emptyVisualLayout = (engine: LayoutEngine): VisualLayout => ({

@@ -44,6 +44,47 @@ class FakeProvider {
 }
 
 describe('CollaborativeDocumentController', () => {
+  it('updates code, config, and visual layout in one transaction', () => {
+    const controller = new CollaborativeDocumentController({
+      apiBaseUrl: 'https://api.example.test',
+      browserOrigin: 'https://app.example.test',
+      diagramId: 'diagram-1',
+      getTicket: vi.fn(),
+      user: { displayName: 'Ada Lovelace', id: 'user-1' }
+    });
+    const originalCode = '---\nconfig:\n  layout: elk\n---\nflowchart LR';
+    controller.code.insert(0, originalCode);
+    controller.config.insert(0, '{}');
+    controller.setVisualLayout({
+      engine: 'elk',
+      mode: 'manual',
+      offsets: { A: { x: 10, y: 20 } }
+    });
+    let transactionCount = 0;
+    let codeChangeCount = 0;
+    controller.doc.on('afterTransaction', () => transactionCount++);
+    controller.code.observe(() => codeChangeCount++);
+
+    controller.setDocumentAndVisualLayout(
+      '---\nconfig:\n  layout: dagre\n---\nflowchart LR',
+      '{"layout":"dagre"}',
+      undefined
+    );
+
+    expect(transactionCount).toBe(1);
+    expect(codeChangeCount).toBe(1);
+    expect(controller.code.toString()).toContain('layout: dagre');
+    expect(controller.config.toString()).toBe('{"layout":"dagre"}');
+    expect(controller.getVisualLayout()).toBeUndefined();
+
+    controller.setDocumentAndVisualLayout(
+      controller.code.toString(),
+      '{"layout":"elk"}',
+      undefined
+    );
+    expect(codeChangeCount).toBe(1);
+  });
+
   it('gets a fresh single-use ticket before recreating a provider', async () => {
     const providers: FakeProvider[] = [];
     const tickets = ['ticket-1', 'ticket-2'];

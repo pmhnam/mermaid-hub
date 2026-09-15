@@ -132,6 +132,53 @@ describe('preview source navigation', () => {
     expect(selectedText(code, field, 'er')).toBe('TEXT status');
   });
 
+  it('maps fields in quoted dotted ER entities', () => {
+    const code = [
+      'erDiagram',
+      '  "catalog.PRODUCTS" {',
+      '    UUID id PK',
+      '    VARCHAR(255) product_name',
+      '  }'
+    ].join('\n');
+    const field = targetFrom(
+      '<svg><g id="graph-entity-catalog.PRODUCTS-0"><g class="attribute-name"><text>id</text></g><g class="attribute-name"><text>product_name</text></g></g></svg>',
+      '.attribute-name:nth-of-type(2) text'
+    );
+
+    annotateSvgSourceNavigation(code, 'er', field.closest('svg') as SVGSVGElement);
+
+    expect(selectedText(code, field, 'er')).toBe('VARCHAR(255) product_name');
+  });
+
+  it('maps duplicate ER relationship labels through their edge identifiers', () => {
+    const code = [
+      'erDiagram',
+      '  "catalog.PRODUCTS" ||--o{ "catalog.VARIANTS" : contains',
+      '  "catalog.PRODUCTS" ||--o{ "catalog.IMAGES" : contains'
+    ].join('\n');
+    const label = targetFrom(
+      [
+        '<svg>',
+        '<g class="edgePaths">',
+        '<path data-et="edge" data-id="id_products_variants_0" />',
+        '<path data-et="edge" data-id="id_products_images_1" />',
+        '</g>',
+        '<g class="edgeLabels">',
+        '<g class="edgeLabel"><g class="label" data-id="id_products_variants_0"><text>contains</text></g></g>',
+        '<g class="edgeLabel"><g class="label" data-id="id_products_images_1"><text>contains</text></g></g>',
+        '</g>',
+        '</svg>'
+      ].join(''),
+      '.edgeLabel:nth-of-type(2) text'
+    );
+
+    annotateSvgSourceNavigation(code, 'er', label.closest('svg') as SVGSVGElement);
+
+    expect(selectedText(code, label, 'er')).toBe(
+      '"catalog.PRODUCTS" ||--o{ "catalog.IMAGES" : contains'
+    );
+  });
+
   it('maps nested class members and sequence messages', () => {
     const classCode = 'classDiagram\n  class Animal {\n    +name: string\n    +move()\n  }';
     const member = targetFrom(

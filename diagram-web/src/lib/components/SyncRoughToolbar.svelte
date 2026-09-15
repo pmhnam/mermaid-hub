@@ -20,6 +20,7 @@
 
 <FloatingToolbar>
   <LayoutToolbar
+    code={inputState.code}
     config={inputState.mermaid}
     diagramType={validatedState.current.diagramType}
     onChange={updateLayoutEngine} />

@@ -24,7 +24,11 @@
   import type { SourceRange, SourceSelectionRequest } from '$lib/types';
   import { createVersionDiff } from '$lib/product/version-diff';
   import { PanZoomState } from '$lib/util/panZoom';
-  import { updateMermaidLayout, type LayoutEngine, type VisualLayout } from '$lib/visual/layout';
+  import {
+    updateMermaidDocumentLayout,
+    type LayoutEngine,
+    type VisualLayout
+  } from '$lib/visual/layout';
   import {
     disableURLSubscription,
     replaceInputState,
@@ -157,8 +161,14 @@
 
   const updateCollaborativeLayout = (engine: LayoutEngine): void => {
     if (!controller || role === 'viewer') return;
-    const config = updateMermaidLayout(controller.config.toString(), engine);
-    if (config) controller.setConfigAndVisualLayout(config, undefined);
+    const document = updateMermaidDocumentLayout(
+      controller.code.toString(),
+      controller.config.toString(),
+      engine
+    );
+    if (document) {
+      controller.setDocumentAndVisualLayout(document.code, document.config, undefined);
+    }
   };
 
   const updateVisualLayout = (layout: VisualLayout): void => {
@@ -461,6 +471,7 @@
       {/if}
       <div class="absolute top-3 right-3 flex items-start gap-2">
         <LayoutToolbar
+          code={currentContent}
           config={currentConfig}
           diagramType={validatedState.current.diagramType}
           disabled={role === 'viewer'}

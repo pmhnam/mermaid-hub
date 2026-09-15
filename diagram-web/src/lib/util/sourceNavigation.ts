@@ -273,7 +273,11 @@ const annotateNestedRanges = (
 
   if (!family.startsWith('sequence') && !family.startsWith('gantt')) {
     annotateOrdered(
-      [...svg.querySelectorAll('[data-et="edge"], .edgePath, .relationshipLine')],
+      [
+        ...svg.querySelectorAll(
+          '[data-et="edge"], .edgePath, .relationshipLine, .edgeLabel .label[data-id]'
+        )
+      ],
       index.edges,
       (element, index) => semanticKey(element, index)
     );

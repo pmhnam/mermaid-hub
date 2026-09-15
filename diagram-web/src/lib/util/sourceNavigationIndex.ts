@@ -74,13 +74,13 @@ const scanEntityBlocks = (
   children: Map<string, SourceRange[]>
 ): void => {
   lines.forEach((line, index) => {
-    const opening = line.text.match(/^\s*([\w-]+)\s*\{/);
+    const opening = line.text.match(/^\s*((?:"[^"]+"|'[^']+'|`[^`]+`|[\w.-]+))\s*\{/);
     if (!opening?.[1]) return;
     const entity = normalizeIdentifier(opening[1]);
     addDeclaration(declarations, entity, selectableRange(line));
     for (const child of lines.slice(index + 1)) {
       if (child.text.trim() === '}') break;
-      if (isSourceStatement(child) && /^\s*[\w-]+\s+[\w-]+(?:\s|$)/.test(child.text)) {
+      if (isSourceStatement(child)) {
         addChildren(children, entity, selectableRange(child));
       }
     }

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   isVisualLayoutSupported,
   layoutEngineFromConfig,
+  layoutEngineFromDocument,
   parseVisualLayout,
+  updateMermaidDocumentLayout,
   updateMermaidLayout,
   visualNodeKey
 } from './layout';
@@ -15,6 +17,87 @@ describe('visual layout', () => {
       '{\n  "theme": "dark",\n  "layout": "elk"\n}'
     );
     expect(updateMermaidLayout('', 'elk')).toBe('{\n  "layout": "elk"\n}');
+  });
+
+  it('reads and updates a layout overridden by frontmatter', () => {
+    const code = [
+      '---',
+      'title: Catalog',
+      'config:',
+      '  theme: dark',
+      '  layout: elk # elk remains available',
+      '---',
+      'erDiagram'
+    ].join('\n');
+
+    expect(layoutEngineFromDocument(code, '{"layout":"dagre"}')).toBe('elk');
+    expect(updateMermaidDocumentLayout(code, '{"theme":"dark"}', 'dagre')).toEqual({
+      code: code.replace('layout: elk', 'layout: dagre'),
+      config: '{\n  "theme": "dark",\n  "layout": "dagre"\n}'
+    });
+  });
+
+  it('updates inline frontmatter without rewriting unrelated formatting', () => {
+    const code = '---\r\nconfig: {"theme":"forest", "layout":"elk"}\r\n---\r\nflowchart LR';
+    const updated = updateMermaidDocumentLayout(code, '{}', 'dagre');
+
+    expect(updated?.code).toBe(
+      '---\r\nconfig: {"theme":"forest", "layout":"dagre"}\r\n---\r\nflowchart LR'
+    );
+    expect(layoutEngineFromDocument(updated?.code ?? '', updated?.config ?? '')).toBe('dagre');
+  });
+
+  it('supports multiline flow-style frontmatter config', () => {
+    const code = [
+      '---',
+      'config: {',
+      '  layout: elk,',
+      '  theme: dark',
+      '}',
+      '---',
+      'flowchart LR'
+    ].join('\n');
+
+    expect(layoutEngineFromDocument(code, '{"layout":"dagre"}')).toBe('elk');
+    expect(updateMermaidDocumentLayout(code, '{}', 'dagre')?.code).toBe(
+      code.replace('layout: elk', 'layout: dagre')
+    );
+  });
+
+  it('does not treat comments or nested strings as frontmatter layout', () => {
+    const comment = '---\nconfig: # layout: elk\n  theme: dark\n---\nflowchart LR';
+    const nested = [
+      '---',
+      'config: { themeVariables: { noteTextColor: "layout: elk" } }',
+      '---',
+      'flowchart LR'
+    ].join('\n');
+
+    expect(layoutEngineFromDocument(comment, '{"layout":"dagre"}')).toBe('dagre');
+    expect(layoutEngineFromDocument(nested, '{"layout":"dagre"}')).toBe('dagre');
+    expect(updateMermaidDocumentLayout(comment, '{}', 'elk')?.code).toBe(comment);
+    expect(updateMermaidDocumentLayout(nested, '{}', 'elk')?.code).toBe(nested);
+  });
+
+  it('resolves and replaces an aliased frontmatter layout', () => {
+    const code = [
+      '---',
+      'engine: &engine elk',
+      'config:',
+      '  layout: *engine',
+      '---',
+      'flowchart LR'
+    ].join('\n');
+
+    expect(layoutEngineFromDocument(code, '{"layout":"dagre"}')).toBe('elk');
+    expect(updateMermaidDocumentLayout(code, '{}', 'dagre')?.code).toBe(
+      code.replace('layout: *engine', 'layout: dagre')
+    );
+  });
+
+  it('leaves source without a frontmatter layout unchanged', () => {
+    const code = '---\nconfig:\n  theme: dark\n---\nflowchart LR';
+    expect(updateMermaidDocumentLayout(code, '{}', 'elk')?.code).toBe(code);
   });
 
   it('validates persisted offsets without accepting invalid coordinates', () => {

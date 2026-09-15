@@ -3,7 +3,7 @@
   import * as Popover from '$/components/ui/popover';
   import {
     isVisualLayoutSupported,
-    layoutEngineFromConfig,
+    layoutEngineFromDocument,
     type LayoutEngine
   } from '$/visual/layout';
   import { cn } from '$lib/utils';
@@ -13,11 +13,13 @@
 
   let {
     config,
+    code,
     diagramType,
     disabled = false,
     onChange
   }: {
     config: string;
+    code: string;
     diagramType?: string;
     disabled?: boolean;
     onChange: (engine: LayoutEngine) => void;
@@ -35,7 +37,7 @@
       label: 'Adaptive'
     }
   ];
-  const selected = $derived(layoutEngineFromConfig(config));
+  const selected = $derived(layoutEngineFromDocument(code, config));
   const unsupported = $derived(diagramType !== undefined && !isVisualLayoutSupported(diagramType));
 
   const choose = (engine: LayoutEngine): void => {

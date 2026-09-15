@@ -16,7 +16,7 @@ import { readJSON, writeJSON } from './persist.svelte';
 import { findUnsafeConfigPaths, stripConfigPaths } from './sanitize';
 import { deserializeState, pakoSerde, serializeState } from './serde';
 import { errorDebug, formatJSON } from './util';
-import { updateMermaidLayout, type LayoutEngine } from '$lib/visual/layout';
+import { updateMermaidDocumentLayout, type LayoutEngine } from '$lib/visual/layout';
 
 export { defaultState };
 
@@ -257,9 +257,10 @@ export const updateConfig = (config: string): void => {
 
 export const updateLayoutEngine = (engine: LayoutEngine): void => {
   update((state) => {
-    const config = updateMermaidLayout(state.mermaid, engine);
-    if (!config) return;
-    state.mermaid = config;
+    const document = updateMermaidDocumentLayout(state.code, state.mermaid, engine);
+    if (!document) return;
+    state.code = document.code;
+    state.mermaid = document.config;
     state.pan = undefined;
     state.zoom = undefined;
     state.visualLayout = undefined;

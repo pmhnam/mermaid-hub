@@ -30,4 +30,20 @@ describe('source navigation index', () => {
     expect(index.children.get('CUSTOMER')).toHaveLength(1);
     expect(index.edges).toHaveLength(2);
   });
+
+  it('indexes fields under quoted dotted ER entity names', () => {
+    const index = buildSourceNavigationIndex(
+      [
+        'erDiagram',
+        '  "catalog.PRODUCTS" {',
+        '    UUID id PK',
+        '    VARCHAR(255) product_name',
+        '  }'
+      ].join('\n'),
+      'er'
+    );
+
+    expect(index.declarations.has('catalog.PRODUCTS')).toBe(true);
+    expect(index.children.get('catalog.PRODUCTS')).toHaveLength(2);
+  });
 });

@@ -14,7 +14,7 @@
   import { mode } from 'mode-watcher';
   import { onMount } from 'svelte';
   import { setupVisualDragging } from '$/visual/drag';
-  import { layoutEngineFromConfig, type VisualLayout } from '$/visual/layout';
+  import { layoutEngineFromDocument, type VisualLayout } from '$/visual/layout';
 
   let {
     onSourceSelect,
@@ -123,7 +123,7 @@
         removeVisualDragging = setupVisualDragging({
           diagramType: detectedDiagramType,
           editable,
-          engine: layoutEngineFromConfig(nextConfig),
+          engine: layoutEngineFromDocument(nextCode, nextConfig),
           layout: currentVisualLayout,
           onChange: onVisualLayoutChange,
           panZoomState,

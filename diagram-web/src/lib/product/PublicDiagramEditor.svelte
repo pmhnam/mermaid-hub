@@ -23,7 +23,11 @@
   import type { PublicDiagram } from '$lib/product/types';
   import type { SourceRange, SourceSelectionRequest } from '$lib/types';
   import { PanZoomState } from '$lib/util/panZoom';
-  import { updateMermaidLayout, type LayoutEngine, type VisualLayout } from '$lib/visual/layout';
+  import {
+    updateMermaidDocumentLayout,
+    type LayoutEngine,
+    type VisualLayout
+  } from '$lib/visual/layout';
   import { silentlySanitizeConfig } from '$lib/util/sanitize';
   import {
     disableURLSubscription,
@@ -87,8 +91,14 @@
 
   const updateCollaborativeLayout = (engine: LayoutEngine): void => {
     if (!controller || !editable) return;
-    const config = updateMermaidLayout(controller.config.toString(), engine);
-    if (config) controller.setConfigAndVisualLayout(config, undefined);
+    const document = updateMermaidDocumentLayout(
+      controller.code.toString(),
+      controller.config.toString(),
+      engine
+    );
+    if (document) {
+      controller.setDocumentAndVisualLayout(document.code, document.config, undefined);
+    }
   };
 
   const updateVisualLayout = (layout: VisualLayout): void => {
@@ -353,6 +363,7 @@
         {/if}
         <div class="absolute top-3 right-3 flex items-start gap-2">
           <LayoutToolbar
+            code={validatedState.current.code}
             config={validatedState.current.mermaid}
             diagramType={validatedState.current.diagramType}
             disabled={!editable}
