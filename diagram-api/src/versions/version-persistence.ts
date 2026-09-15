@@ -37,6 +37,7 @@ export async function insertDiagramVersion(
     versionNumber,
     content: state.content,
     config: state.config,
+    visualLayout: state.visualLayout,
     type,
     message,
     createdById: actor.type === 'registered' ? actor.userId : null,

@@ -1,11 +1,13 @@
 import {
   IsOptional,
+  IsObject,
   IsString,
   IsUUID,
   Length,
   MaxLength,
   ValidateIf,
 } from 'class-validator';
+import type { DiagramVisualLayout } from '../../versions/version-state.provider.js';
 
 export class UpdateDiagramDto {
   @IsOptional()
@@ -27,4 +29,9 @@ export class UpdateDiagramDto {
   @IsString()
   @MaxLength(1_000_000)
   currentConfig?: string;
+
+  @IsOptional()
+  @ValidateIf((_object, value) => value !== null)
+  @IsObject()
+  visualLayout?: DiagramVisualLayout | null;
 }

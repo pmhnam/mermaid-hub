@@ -27,12 +27,14 @@ describe('Y.Doc helpers', () => {
     const doc = createDocumentFromDiagram({
       currentContent: 'graph TD',
       currentConfig: '{"theme":"dark"}',
+      visualLayout: null,
       yjsState: null,
     });
 
     expect(readDocumentState(doc)).toEqual({
       content: 'graph TD',
       config: '{"theme":"dark"}',
+      visualLayout: null,
     });
   });
 
@@ -43,13 +45,27 @@ describe('Y.Doc helpers', () => {
     const doc = createDocumentFromDiagram({
       currentContent: 'stale',
       currentConfig: 'stale',
+      visualLayout: null,
       yjsState: Buffer.from(Y.encodeStateAsUpdate(original)),
     });
 
-    replaceDocumentState(doc, { content: 'restored', config: 'new config' });
+    replaceDocumentState(doc, {
+      content: 'restored',
+      config: 'new config',
+      visualLayout: {
+        engine: 'elk',
+        mode: 'manual',
+        offsets: { A: { x: 12, y: -4 } },
+      },
+    });
     expect(readDocumentState(doc)).toEqual({
       content: 'restored',
       config: 'new config',
+      visualLayout: {
+        engine: 'elk',
+        mode: 'manual',
+        offsets: { A: { x: 12, y: -4 } },
+      },
     });
   });
 

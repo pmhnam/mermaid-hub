@@ -24,6 +24,7 @@
   import { validatedState, updateCodeStore, urls } from '$/util/state.svelte';
   import { logEvent } from '$/util/stats';
   import { initHandler } from '$/util/util';
+  import type { VisualLayout } from '$/visual/layout';
   import { onMount } from 'svelte';
   import CodeIcon from '~icons/custom/code';
   import HistoryIcon from '~icons/material-symbols/history';
@@ -60,6 +61,10 @@
     isViewMode = false;
     updateCodeStore({ editorMode: 'code' });
     selectionRequest = { ...range, id: ++selectionId };
+  };
+
+  const updateVisualLayout = (visualLayout: VisualLayout): void => {
+    updateCodeStore({ visualLayout });
   };
 
   onMount(async () => {
@@ -182,7 +187,10 @@
           <View
             onSourceSelect={selectSource}
             {panZoomState}
-            shouldShowGrid={validatedState.current.grid} />
+            shouldShowGrid={validatedState.current.grid}
+            editable
+            onVisualLayoutChange={updateVisualLayout}
+            visualLayout={validatedState.current.visualLayout} />
           <div class="absolute top-0 left-5 hidden md:block"><EnhancedEditsButton /></div>
           <div class="absolute top-0 right-0">
             <PanZoomToolbar {panZoomState} fullScreenHref={urls.current.view} />

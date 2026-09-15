@@ -15,7 +15,7 @@ describe('insertDiagramVersion', () => {
     const version = await insertDiagramVersion(
       manager as never,
       diagram,
-      { content: 'graph TD', config: '' },
+      { content: 'graph TD', config: '', visualLayout: null },
       'checkpoint' as never,
       null,
       {

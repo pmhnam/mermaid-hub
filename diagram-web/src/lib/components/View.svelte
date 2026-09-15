@@ -13,15 +13,23 @@
   import type { MermaidConfig } from 'mermaid';
   import { mode } from 'mode-watcher';
   import { onMount } from 'svelte';
+  import { setupVisualDragging } from '$/visual/drag';
+  import { layoutEngineFromConfig, type VisualLayout } from '$/visual/layout';
 
   let {
     onSourceSelect,
     panZoomState = new PanZoomState(),
-    shouldShowGrid = true
+    shouldShowGrid = true,
+    editable = false,
+    visualLayout,
+    onVisualLayoutChange
   }: {
+    editable?: boolean;
     onSourceSelect?: (range: SourceRange) => void;
+    onVisualLayoutChange?: (layout: VisualLayout) => void;
     panZoomState?: PanZoomState;
     shouldShowGrid?: boolean;
+    visualLayout?: VisualLayout;
   } = $props();
   let code = '';
   let config = '';
@@ -34,6 +42,8 @@
   let panZoom = true;
   let manualUpdate = true;
   let renderedDiagramType = '';
+  let visualLayoutKey = '';
+  let removeVisualDragging: (() => void) | undefined;
   let waitForFontAwesomeToLoad: FontAwesome['waitForFontAwesomeToLoad'] | undefined = $state();
 
   // Set up panZoom state observer to update the store when pan/zoom changes
@@ -67,12 +77,14 @@
     try {
       if (container) {
         manualUpdate = true;
+        const currentVisualLayout = visualLayout ?? state.visualLayout;
         // Do not render if there is no change in Code/Config/PanZoom
         if (
           code === state.code &&
           config === state.mermaid &&
           rough === state.rough &&
-          panZoom === state.panZoom
+          panZoom === state.panZoom &&
+          visualLayoutKey === JSON.stringify(currentVisualLayout ?? null)
         ) {
           return;
         }
@@ -107,12 +119,24 @@
         if (graphDiv && detectedDiagramType) {
           annotateSvgSourceNavigation(code, detectedDiagramType, graphDiv);
         }
+        removeVisualDragging?.();
+        removeVisualDragging = setupVisualDragging({
+          diagramType: detectedDiagramType,
+          editable,
+          engine: layoutEngineFromConfig(nextConfig),
+          layout: currentVisualLayout,
+          onChange: onVisualLayoutChange,
+          panZoomState,
+          rough: state.rough,
+          svg: graphDiv
+        });
         if (graphDiv && state.panZoom) {
           handlePanZoom(state, graphDiv);
         }
         if (view?.parentElement && scroll) {
           view.parentElement.scrollTop = scroll;
         }
+        visualLayoutKey = JSON.stringify(currentVisualLayout ?? null);
         error = undefined;
       } else if (manualUpdate) {
         manualUpdate = false;
@@ -130,6 +154,7 @@
 
   onMount(() => {
     setupPanZoomObserver();
+    return () => removeVisualDragging?.();
   });
 
   // Queue state changes to avoid race condition

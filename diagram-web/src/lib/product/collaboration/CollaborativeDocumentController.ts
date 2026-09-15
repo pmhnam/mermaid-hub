@@ -10,6 +10,7 @@ import {
 import { reconnectDelay, websocketProviderAddress } from './lifecycle';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
+import { parseVisualLayout, type VisualLayout } from '$/visual/layout';
 
 export type CollaborationStatus = 'connecting' | 'disconnected' | 'error' | 'synced';
 
@@ -41,6 +42,7 @@ export class CollaborativeDocumentController {
   readonly doc = new Y.Doc();
   readonly code = this.doc.getText('code');
   readonly config = this.doc.getText('config');
+  readonly layout = this.doc.getMap<unknown>('visualLayout');
   error = '';
   presence: PresenceUser[] = [];
   previewCursors: RemotePreviewCursor[] = [];
@@ -70,6 +72,40 @@ export class CollaborativeDocumentController {
 
   setPreviewCursor(position: PreviewCursorPosition | null): void {
     this.provider?.awareness.setLocalStateField('previewCursor', position);
+  }
+
+  getVisualLayout(): VisualLayout | undefined {
+    return parseVisualLayout({
+      engine: this.layout.get('engine'),
+      mode: this.layout.get('mode'),
+      offsets: this.layout.get('offsets')
+    });
+  }
+
+  setVisualLayout(layout: VisualLayout | undefined): void {
+    this.doc.transact(() => {
+      if (!layout) {
+        this.layout.clear();
+        return;
+      }
+      this.layout.set('engine', layout.engine);
+      this.layout.set('mode', layout.mode);
+      this.layout.set('offsets', layout.offsets);
+    });
+  }
+
+  setConfigAndVisualLayout(config: string, layout: VisualLayout | undefined): void {
+    this.doc.transact(() => {
+      this.config.delete(0, this.config.length);
+      this.config.insert(0, config);
+      if (!layout) {
+        this.layout.clear();
+        return;
+      }
+      this.layout.set('engine', layout.engine);
+      this.layout.set('mode', layout.mode);
+      this.layout.set('offsets', layout.offsets);
+    });
   }
 
   async start(): Promise<void> {

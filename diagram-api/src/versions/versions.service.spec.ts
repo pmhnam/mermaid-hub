@@ -190,9 +190,10 @@ describe('version transaction helpers', () => {
       }),
     };
     const stateProvider = {
-      getAuthoritativeState: vi.fn().mockResolvedValue({
-        content: 'live state',
-        config: 'live config',
+        getAuthoritativeState: vi.fn().mockResolvedValue({
+          content: 'live state',
+          config: 'live config',
+          visualLayout: null,
       }),
       runExclusive: vi.fn(async (_id, operation) => operation()),
       replaceActiveState: vi.fn().mockResolvedValue(undefined),
@@ -217,8 +218,9 @@ describe('version transaction helpers', () => {
       expect.any(Function),
     );
     expect(stateProvider.replaceActiveState).toHaveBeenCalledWith(diagram.id, {
-      content: 'restored',
-      config: 'restored config',
+        content: 'restored',
+        config: 'restored config',
+        visualLayout: null,
     });
     expect(stateProvider.resetCheckpointState).toHaveBeenCalledWith(diagram.id);
     expect(manager.save.mock.calls[0][1]).toMatchObject({

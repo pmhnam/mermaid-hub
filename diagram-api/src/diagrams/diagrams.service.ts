@@ -48,6 +48,7 @@ export class DiagramsService {
         title: dto.title.trim(),
         currentContent: dto.currentContent ?? '',
         currentConfig: dto.currentConfig ?? '',
+        visualLayout: null,
         yjsState: null,
         versionSeq: 0,
         currentVersionId: null,
@@ -100,6 +101,9 @@ export class DiagramsService {
       }
       if (dto.currentConfig !== undefined) {
         diagram.currentConfig = dto.currentConfig;
+      }
+      if (dto.visualLayout !== undefined) {
+        diagram.visualLayout = dto.visualLayout;
       }
       return manager.save(Diagram, diagram);
     });

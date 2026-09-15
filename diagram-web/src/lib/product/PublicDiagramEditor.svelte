@@ -1,6 +1,7 @@
 <script lang="ts">
   import { base } from '$app/paths';
   import Editor from '$lib/components/Editor.svelte';
+  import LayoutToolbar from '$lib/components/LayoutToolbar.svelte';
   import PanZoomToolbar from '$lib/components/PanZoomToolbar.svelte';
   import View from '$lib/components/View.svelte';
   import { Button } from '$lib/components/ui/button';
@@ -22,6 +23,7 @@
   import type { PublicDiagram } from '$lib/product/types';
   import type { SourceRange, SourceSelectionRequest } from '$lib/types';
   import { PanZoomState } from '$lib/util/panZoom';
+  import { updateMermaidLayout, type LayoutEngine, type VisualLayout } from '$lib/visual/layout';
   import { silentlySanitizeConfig } from '$lib/util/sanitize';
   import {
     disableURLSubscription,
@@ -52,6 +54,7 @@
   let exportOpen = $state(false);
   let exportSvgElement = $state<SVGSVGElement | null>(null);
   let previewElement = $state<HTMLElement | null>(null);
+  let currentVisualLayout = $state<VisualLayout | undefined>();
   let selectionRequest = $state<SourceSelectionRequest | undefined>();
   let selectionId = 0;
   let isMobile = $derived(width < 768);
@@ -82,7 +85,22 @@
     selectionRequest = { ...range, id: ++selectionId };
   };
 
-  const displayDocument = (content: string, config: string, initial = false): void => {
+  const updateCollaborativeLayout = (engine: LayoutEngine): void => {
+    if (!controller || !editable) return;
+    const config = updateMermaidLayout(controller.config.toString(), engine);
+    if (config) controller.setConfigAndVisualLayout(config, undefined);
+  };
+
+  const updateVisualLayout = (layout: VisualLayout): void => {
+    if (controller && editable) controller.setVisualLayout(layout);
+  };
+
+  const displayDocument = (
+    content: string,
+    config: string,
+    initial = false,
+    visualLayout?: VisualLayout
+  ): void => {
     const safeConfig = JSON.stringify(
       silentlySanitizeConfig(config || defaultState.mermaid),
       null,
@@ -93,10 +111,11 @@
         ...defaultState,
         code: content,
         editorMode: 'code',
-        mermaid: safeConfig
+        mermaid: safeConfig,
+        visualLayout
       });
     } else {
-      updateCodeStore({ code: content, mermaid: safeConfig });
+      updateCodeStore({ code: content, mermaid: safeConfig, visualLayout });
     }
   };
 
@@ -130,10 +149,12 @@
       const syncDocument = (): void => {
         const content = collaboration.code.toString();
         const config = collaboration.config.toString();
-        if (collaboration.synced) displayDocument(content, config);
+        currentVisualLayout = collaboration.getVisualLayout();
+        if (collaboration.synced) displayDocument(content, config, false, currentVisualLayout);
       };
       collaboration.code.observe(syncDocument);
       collaboration.config.observe(syncDocument);
+      collaboration.layout.observe(syncDocument);
       const unsubscribe = collaboration.subscribe(() => {
         collaborationStatus = collaboration.status;
         collaborationError = collaboration.error;
@@ -153,6 +174,7 @@
         unsubscribe();
         collaboration.code.unobserve(syncDocument);
         collaboration.config.unobserve(syncDocument);
+        collaboration.layout.unobserve(syncDocument);
         collaboration.destroy();
       };
       await collaboration.start();
@@ -318,7 +340,10 @@
         <View
           onSourceSelect={selectSource}
           {panZoomState}
-          shouldShowGrid={validatedState.current.grid} />
+          shouldShowGrid={validatedState.current.grid}
+          {editable}
+          onVisualLayoutChange={updateVisualLayout}
+          visualLayout={validatedState.current.visualLayout} />
         {#if controller}
           <PreviewCursors
             container={previewElement}
@@ -327,6 +352,11 @@
             revision={previewRevision} />
         {/if}
         <div class="absolute top-3 right-3 flex items-start gap-2">
+          <LayoutToolbar
+            config={validatedState.current.mermaid}
+            diagramType={validatedState.current.diagramType}
+            disabled={!editable}
+            onChange={updateCollaborativeLayout} />
           <PanZoomToolbar {panZoomState} compact />
           <Button
             class="border border-slate-200 bg-white shadow-sm hover:bg-slate-100"

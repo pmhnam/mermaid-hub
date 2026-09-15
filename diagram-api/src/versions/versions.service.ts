@@ -21,6 +21,7 @@ export function applyDocumentState(
 ): void {
   diagram.currentContent = state.content;
   diagram.currentConfig = state.config;
+  diagram.visualLayout = state.visualLayout;
   diagram.yjsState = null;
 }
 
@@ -103,6 +104,7 @@ export class VersionsService {
         const restoredState = {
           content: target.content,
           config: target.config,
+          visualLayout: target.visualLayout ?? null,
         };
         applyDocumentState(diagram, restoredState);
         const restored = await insertDiagramVersion(

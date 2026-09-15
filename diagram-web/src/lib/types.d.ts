@@ -3,6 +3,7 @@ import type { HTMLInputTypeAttribute } from 'svelte/elements';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
 import 'unplugin-icons/types/svelte';
+import type { VisualLayout } from './visual/layout';
 
 export interface MarkerData {
   severity: number;
@@ -35,6 +36,7 @@ export interface State {
   grid?: boolean;
   editorMode?: EditorMode;
   pan?: { x: number; y: number };
+  visualLayout?: VisualLayout;
   zoom?: number;
   loader?: LoaderConfig;
 }

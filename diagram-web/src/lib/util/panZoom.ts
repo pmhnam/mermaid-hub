@@ -148,6 +148,12 @@ export class PanZoomState {
     this.pzoom?.zoomOut();
   }
 
+  public setPanEnabled(enabled: boolean): void {
+    this.isPanEnabled = enabled;
+    if (enabled) this.pzoom?.enablePan();
+    else this.pzoom?.disablePan();
+  }
+
   public reset() {
     this.pzoom?.reset();
     // Zoom out a bit to avoid overlap with the toolbar

@@ -11,6 +11,7 @@ import {
 import { Diagram } from '../../diagrams/entities/diagram.entity.js';
 import { PublicLink } from '../../public-links/entities/public-link.entity.js';
 import { User } from '../../users/entities/user.entity.js';
+import type { DiagramVisualLayout } from '../version-state.provider.js';
 
 export enum VersionType {
   Manual = 'manual',
@@ -44,6 +45,9 @@ export class DiagramVersion {
 
   @Column({ type: 'text' })
   config: string;
+
+  @Column({ name: 'visual_layout', type: 'jsonb', nullable: true })
+  visualLayout: DiagramVisualLayout | null;
 
   @Column({ type: 'enum', enum: VersionType, enumName: 'version_type' })
   type: VersionType;

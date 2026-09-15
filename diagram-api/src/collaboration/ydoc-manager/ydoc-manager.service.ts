@@ -23,6 +23,7 @@ import { ResourceRole } from '../../permissions/permission.types.js';
 import {
   DiagramDocumentState,
   VersionStateProvider,
+  type DiagramVisualLayout,
 } from '../../versions/version-state.provider.js';
 import { VersionType } from '../../versions/entities/version.entity.js';
 import {
@@ -54,7 +55,10 @@ interface Room {
 }
 
 export function createDocumentFromDiagram(
-  diagram: Pick<Diagram, 'currentContent' | 'currentConfig' | 'yjsState'>,
+  diagram: Pick<
+    Diagram,
+    'currentContent' | 'currentConfig' | 'visualLayout' | 'yjsState'
+  >,
 ): Y.Doc {
   const doc = new Y.Doc();
   if (diagram.yjsState?.length) {
@@ -63,6 +67,11 @@ export function createDocumentFromDiagram(
     doc.getText('code').insert(0, diagram.currentContent);
     doc.getText('config').insert(0, diagram.currentConfig);
   }
+  if (diagram.visualLayout && doc.getMap('visualLayout').size === 0) {
+    for (const [key, value] of Object.entries(diagram.visualLayout)) {
+      doc.getMap('visualLayout').set(key, value);
+    }
+  }
   return doc;
 }
 
@@ -70,6 +79,10 @@ export function readDocumentState(doc: Y.Doc): DiagramDocumentState {
   return {
     content: doc.getText('code').toString(),
     config: doc.getText('config').toString(),
+    visualLayout:
+      doc.getMap('visualLayout').size > 0
+        ? (doc.getMap('visualLayout').toJSON() as DiagramVisualLayout)
+        : null,
   };
 }
 
@@ -85,6 +98,13 @@ export function replaceDocumentState(
     code.insert(0, state.content);
     config.delete(0, config.length);
     config.insert(0, state.config);
+    const layout = doc.getMap('visualLayout');
+    layout.clear();
+    if (state.visualLayout) {
+      for (const [key, value] of Object.entries(state.visualLayout)) {
+        layout.set(key, value);
+      }
+    }
   }, origin);
 }
 
@@ -399,6 +419,7 @@ export class YdocManagerService
     await this.diagrams.update(room.diagramId, {
       currentContent: state.content,
       currentConfig: state.config,
+      visualLayout: state.visualLayout,
       yjsState: Buffer.from(Y.encodeStateAsUpdate(room.doc)),
     });
   }

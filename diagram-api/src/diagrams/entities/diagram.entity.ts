@@ -13,6 +13,7 @@ import {
 import { Folder } from '../../folders/entities/folder.entity.js';
 import { User } from '../../users/entities/user.entity.js';
 import { Workspace } from '../../workspaces/entities/workspace.entity.js';
+import type { DiagramVisualLayout } from '../../versions/version-state.provider.js';
 import type { DiagramVersion } from '../../versions/entities/version.entity.js';
 
 @Entity('diagrams')
@@ -51,6 +52,9 @@ export class Diagram {
 
   @Column({ name: 'current_config', type: 'text', default: '' })
   currentConfig: string;
+
+  @Column({ name: 'visual_layout', type: 'jsonb', nullable: true })
+  visualLayout: DiagramVisualLayout | null;
 
   @Column({ name: 'yjs_state', type: 'bytea', nullable: true })
   yjsState: Buffer | null;

@@ -1,7 +1,14 @@
 <script lang="ts">
   import FloatingToolbar from '$/components/FloatingToolbar.svelte';
+  import LayoutToolbar from '$/components/LayoutToolbar.svelte';
   import { Toggle } from '$/components/ui/toggle';
-  import { defaultState, inputState, updateCodeStore } from '$/util/state.svelte';
+  import {
+    defaultState,
+    inputState,
+    updateCodeStore,
+    updateLayoutEngine,
+    validatedState
+  } from '$/util/state.svelte';
   import RoughIcon from '~icons/material-symbols/draw-outline-rounded';
   import BackgroundIcon from '~icons/material-symbols/grid-4x4-rounded';
 
@@ -12,6 +19,10 @@
 </script>
 
 <FloatingToolbar>
+  <LayoutToolbar
+    config={inputState.mermaid}
+    diagramType={validatedState.current.diagramType}
+    onChange={updateLayoutEngine} />
   <Toggle
     bind:pressed={() => inputState.rough, (rough) => updateCodeStore({ rough })}
     size="sm"

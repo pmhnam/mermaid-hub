@@ -1,9 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { Diagram } from '../diagrams/entities/diagram.entity.js';
+import type { Diagram } from '../diagrams/entities/diagram.entity.js';
+
+export interface DiagramVisualLayout {
+  engine: string;
+  mode: string;
+  offsets: Record<string, { x: number; y: number }>;
+}
 
 export interface DiagramDocumentState {
   content: string;
   config: string;
+  visualLayout: DiagramVisualLayout | null;
 }
 
 @Injectable()
@@ -12,6 +19,7 @@ export class VersionStateProvider {
     return {
       content: diagram.currentContent,
       config: diagram.currentConfig,
+      visualLayout: diagram.visualLayout ?? null,
     };
   }
 

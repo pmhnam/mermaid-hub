@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
   import Editor from '$lib/components/Editor.svelte';
+  import LayoutToolbar from '$lib/components/LayoutToolbar.svelte';
   import PanZoomToolbar from '$lib/components/PanZoomToolbar.svelte';
   import View from '$lib/components/View.svelte';
   import { Button } from '$lib/components/ui/button';
@@ -23,6 +24,7 @@
   import type { SourceRange, SourceSelectionRequest } from '$lib/types';
   import { createVersionDiff } from '$lib/product/version-diff';
   import { PanZoomState } from '$lib/util/panZoom';
+  import { updateMermaidLayout, type LayoutEngine, type VisualLayout } from '$lib/visual/layout';
   import {
     disableURLSubscription,
     replaceInputState,
@@ -66,6 +68,7 @@
   let actionMessage = $state('');
   let currentContent = $state('');
   let currentConfig = $state('');
+  let currentVisualLayout = $state<VisualLayout | undefined>();
   let selectionRequest = $state<SourceSelectionRequest | undefined>();
   let selectionId = 0;
   let previewRevision = $derived(presenceRevision(currentContent, currentConfig));
@@ -152,6 +155,16 @@
     selectionRequest = { ...range, id: ++selectionId };
   };
 
+  const updateCollaborativeLayout = (engine: LayoutEngine): void => {
+    if (!controller || role === 'viewer') return;
+    const config = updateMermaidLayout(controller.config.toString(), engine);
+    if (config) controller.setConfigAndVisualLayout(config, undefined);
+  };
+
+  const updateVisualLayout = (layout: VisualLayout): void => {
+    if (controller && role !== 'viewer') controller.setVisualLayout(layout);
+  };
+
   const initialize = async (): Promise<void> => {
     disableURLSubscription();
     if (window.location.hash) {
@@ -184,10 +197,18 @@
       const syncDocument = (): void => {
         currentContent = collaboration.code.toString();
         currentConfig = collaboration.config.toString();
-        if (loaded) updateCodeStore({ code: currentContent, mermaid: currentConfig });
+        currentVisualLayout = collaboration.getVisualLayout();
+        if (loaded) {
+          updateCodeStore({
+            code: currentContent,
+            mermaid: currentConfig,
+            visualLayout: currentVisualLayout
+          });
+        }
       };
       collaboration.code.observe(syncDocument);
       collaboration.config.observe(syncDocument);
+      collaboration.layout.observe(syncDocument);
       const unsubscribe = collaboration.subscribe(() => {
         collaborationStatus = collaboration.status;
         collaborationError = collaboration.error;
@@ -200,7 +221,8 @@
             ...defaultState,
             code: currentContent,
             editorMode: 'code',
-            mermaid: currentConfig
+            mermaid: currentConfig,
+            visualLayout: currentVisualLayout
           });
           loaded = true;
           void loadVersions();
@@ -210,6 +232,7 @@
         unsubscribe();
         collaboration.code.unobserve(syncDocument);
         collaboration.config.unobserve(syncDocument);
+        collaboration.layout.unobserve(syncDocument);
         collaboration.destroy();
       };
       await collaboration.start();
@@ -425,7 +448,10 @@
       <View
         onSourceSelect={selectSource}
         {panZoomState}
-        shouldShowGrid={validatedState.current.grid} />
+        shouldShowGrid={validatedState.current.grid}
+        editable={role !== 'viewer'}
+        onVisualLayoutChange={updateVisualLayout}
+        visualLayout={validatedState.current.visualLayout} />
       {#if controller}
         <PreviewCursors
           container={previewElement}
@@ -434,6 +460,11 @@
           revision={previewRevision} />
       {/if}
       <div class="absolute top-3 right-3 flex items-start gap-2">
+        <LayoutToolbar
+          config={currentConfig}
+          diagramType={validatedState.current.diagramType}
+          disabled={role === 'viewer'}
+          onChange={updateCollaborativeLayout} />
         <PanZoomToolbar {panZoomState} compact />
         <Button
           class="border border-slate-200 bg-white shadow-sm hover:bg-slate-100"

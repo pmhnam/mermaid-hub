@@ -1,3 +1,5 @@
+import type { VisualLayout } from '$/visual/layout';
+
 export interface User {
   id: string;
   email: string;
@@ -39,6 +41,7 @@ export interface Diagram {
   title: string;
   currentContent: string;
   currentConfig: string;
+  visualLayout?: VisualLayout | null;
   currentVersionId: string | null;
   ownerId: string;
   versionSeq: number;
@@ -84,6 +87,7 @@ export interface UpdateDiagramInput {
   folderId?: string | null;
   currentContent?: string;
   currentConfig?: string;
+  visualLayout?: VisualLayout | null;
 }
 
 export type ResourceRole = 'viewer' | 'editor' | 'owner';
@@ -123,6 +127,7 @@ export interface DiagramVersion {
   id: string;
   message: string | null;
   type: 'checkpoint' | 'manual' | 'restore';
+  visualLayout?: VisualLayout | null;
   versionNumber: number;
 }
 
