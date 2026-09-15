@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { InitialSchema1757318400000 } from './migrations/1757318400000-InitialSchema.js';
 import { PublicDiagramLinks1788940800000 } from './migrations/1788940800000-PublicDiagramLinks.js';
+import { VisualLayout1790035200000 } from './migrations/1790035200000-VisualLayout.js';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { PublicDiagramLinks1788940800000 } from './migrations/1788940800000-Publ
         migrations: [
           InitialSchema1757318400000,
           PublicDiagramLinks1788940800000,
+          VisualLayout1790035200000,
         ],
         migrationsRun: config.get('DB_MIGRATIONS_RUN', 'false') === 'true',
         ssl:
