@@ -120,6 +120,18 @@ describe('preview source navigation', () => {
     expect(selectedText(code, edge, 'er')).toBe('CUSTOMER ||--o{ ORDER : places');
   });
 
+  it('keeps ER fields specific when only the table has source metadata', () => {
+    const code = ['erDiagram', '  CUSTOMER {', '    UUID id PK', '    TEXT status', '  }'].join(
+      '\n'
+    );
+    const field = targetFrom(
+      '<svg><g id="graph-entity-CUSTOMER-0" data-source-start="11" data-source-end="21"><g class="attribute-name"><text>id</text></g><g class="attribute-name" data-field="status"><text>status</text></g></g></svg>',
+      '[data-field="status"] text'
+    );
+
+    expect(selectedText(code, field, 'er')).toBe('TEXT status');
+  });
+
   it('maps nested class members and sequence messages', () => {
     const classCode = 'classDiagram\n  class Animal {\n    +name: string\n    +move()\n  }';
     const member = targetFrom(

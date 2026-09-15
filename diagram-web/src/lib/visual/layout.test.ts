@@ -14,6 +14,7 @@ describe('visual layout', () => {
     expect(updateMermaidLayout('{"theme":"dark"}', 'elk')).toBe(
       '{\n  "theme": "dark",\n  "layout": "elk"\n}'
     );
+    expect(updateMermaidLayout('', 'elk')).toBe('{\n  "layout": "elk"\n}');
   });
 
   it('validates persisted offsets without accepting invalid coordinates', () => {

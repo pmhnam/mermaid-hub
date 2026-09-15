@@ -30,7 +30,11 @@ export const layoutEngineFromConfig = (config: string | MermaidConfig): LayoutEn
 
 export const updateMermaidLayout = (configText: string, engine: LayoutEngine): string | null => {
   try {
-    const config = JSON.parse(configText) as MermaidConfig;
+    const parsed = configText.trim() ? JSON.parse(configText) : {};
+    const config =
+      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as MermaidConfig)
+        : {};
     config.layout = engine;
     return JSON.stringify(config, undefined, 2);
   } catch {

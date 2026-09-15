@@ -119,6 +119,35 @@ const rangeFromUniqueText = (lines: SourceLine[], target: Element): SourceRange 
   return matches.length === 1 ? selectableRange(matches[0]) : null;
 };
 
+const rangeFromErField = (
+  code: string,
+  target: Element,
+  svg: SVGSVGElement
+): SourceRange | null => {
+  const field = target.closest(
+    '.attribute-type, .attribute-name, .attribute-keys, .attribute-comment, .row-rect-even, .row-rect-odd'
+  );
+  const node = field?.closest('g[id]');
+  const identifier = node ? nodeIdentifier(node, svg) : null;
+  const fields = identifier
+    ? buildSourceNavigationIndex(code, 'er').children.get(identifier)
+    : undefined;
+  if (!field || !node || !fields?.length) return null;
+
+  const isRow =
+    field.classList.contains('row-rect-even') || field.classList.contains('row-rect-odd');
+  const className = isRow
+    ? '.row-rect-even, .row-rect-odd'
+    : [...field.classList]
+        .filter((name) => name.startsWith('attribute-'))
+        .map((name) => `.${name}`)
+        .join(', ');
+  if (!className) return null;
+  const siblings = [...node.querySelectorAll(className)];
+  const fieldIndex = siblings.indexOf(field);
+  return fieldIndex >= 0 && fields[fieldIndex] ? fields[fieldIndex] : null;
+};
+
 const setSourceRange = (element: Element, range: SourceRange): void => {
   element.setAttribute('data-source-start', String(range.start));
   element.setAttribute('data-source-end', String(range.end));
@@ -285,6 +314,10 @@ export const sourceRangeForSvgTarget = (
     diagramType
   );
   if (!supported) return null;
+  if (diagramType.toLowerCase().startsWith('er')) {
+    const nestedRange = rangeFromErField(code, target, svg);
+    if (nestedRange) return nestedRange;
+  }
   const metadataRange = rangeFromMetadata(target, svg);
   if (metadataRange) return metadataRange;
   const lines = sourceLines(code);
