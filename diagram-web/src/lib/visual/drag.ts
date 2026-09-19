@@ -29,6 +29,8 @@ interface ActiveDrag {
   startOffset: { x: number; y: number };
   pointerStart: { x: number; y: number };
   moved: boolean;
+  pointerId: number;
+  wasPanEnabled: boolean;
 }
 
 const pointFromEvent = (svg: SVGSVGElement, event: PointerEvent): DOMPoint | undefined => {
@@ -60,6 +62,7 @@ export const setupVisualDragging = ({
     return () => undefined;
   }
   let layout = currentLayout?.engine === engine ? currentLayout : emptyVisualLayout(engine);
+  const updateEdges = diagramType?.startsWith('er') ? erEdgeUpdater(svg) : undefined;
   for (const node of visualNodeElements(svg)) {
     const baseTransform =
       node.getAttribute('data-visual-base-transform') ?? node.getAttribute('transform') ?? '';
@@ -74,13 +77,17 @@ export const setupVisualDragging = ({
       node.setAttribute('transform', visualTransform(baseTransform, layout.offsets[key]));
     }
   }
-  const updateEdges = diagramType?.startsWith('er') ? erEdgeUpdater(svg) : undefined;
   updateEdges?.(layout.offsets);
   if (!editable || !onChange) return () => undefined;
 
   let active: ActiveDrag | undefined;
   const handleDown = (event: PointerEvent): void => {
-    if (event.button !== 0) return;
+    // A second finger changes the gesture into pinch-to-zoom, cancelling a node move.
+    if (event.pointerType === 'touch' && !event.isPrimary) {
+      finish(undefined, false);
+      return;
+    }
+    if (event.button !== 0 || !event.isPrimary || active || panZoomState.isSpacePanning) return;
     const element = (event.target as Element | null)?.closest<SVGGElement>('[data-visual-node]');
     const key = element?.getAttribute('data-visual-node');
     const start = pointFromEvent(svg, event);
@@ -91,14 +98,16 @@ export const setupVisualDragging = ({
       element,
       key,
       moved: false,
+      pointerId: event.pointerId,
       pointerStart: { x: event.clientX, y: event.clientY },
       start,
-      startOffset: layout.offsets[key] ?? { x: 0, y: 0 }
+      startOffset: layout.offsets[key] ?? { x: 0, y: 0 },
+      wasPanEnabled: panZoomState.isPanEnabled
     };
     panZoomState.setPanEnabled(false);
   };
   const handleMove = (event: PointerEvent): void => {
-    if (!active) return;
+    if (!active || active.pointerId !== event.pointerId) return;
     if (!active.moved) {
       if (
         Math.hypot(event.clientX - active.pointerStart.x, event.clientY - active.pointerStart.y) < 5
@@ -126,16 +135,16 @@ export const setupVisualDragging = ({
       }
     });
   };
-  const finish = (event: PointerEvent, commit: boolean): void => {
-    if (!active) return;
+  const finish = (event: PointerEvent | undefined, commit: boolean): void => {
+    if (!active || (event && active.pointerId !== event.pointerId)) return;
     const drag = active;
     active = undefined;
-    if (drag.element.hasPointerCapture(event.pointerId))
-      drag.element.releasePointerCapture(event.pointerId);
+    if (drag.element.hasPointerCapture(drag.pointerId))
+      drag.element.releasePointerCapture(drag.pointerId);
     drag.element.style.cursor = 'grab';
-    panZoomState.setPanEnabled(true);
+    panZoomState.setPanEnabled(drag.wasPanEnabled);
     if (!drag.moved) return;
-    const point = pointFromEvent(svg, event);
+    const point = event ? pointFromEvent(svg, event) : undefined;
     if (!commit || !point) {
       drag.element.setAttribute('transform', visualTransform(drag.baseTransform, drag.startOffset));
       updateEdges?.(layout.offsets);
@@ -156,21 +165,24 @@ export const setupVisualDragging = ({
   };
   const handleUp = (event: PointerEvent): void => finish(event, true);
   const handleCancel = (event: PointerEvent): void => finish(event, false);
+  const handleBlur = (): void => finish(undefined, false);
   svg.addEventListener('pointerdown', handleDown, true);
   svg.addEventListener('pointermove', handleMove, true);
   window.addEventListener('pointerup', handleUp, true);
   window.addEventListener('pointercancel', handleCancel, true);
+  window.addEventListener('blur', handleBlur);
   return () => {
     if (active) {
       active.element.setAttribute(
         'transform',
         visualTransform(active.baseTransform, active.startOffset)
       );
-      panZoomState.setPanEnabled(true);
+      panZoomState.setPanEnabled(active.wasPanEnabled);
     }
     svg.removeEventListener('pointerdown', handleDown, true);
     svg.removeEventListener('pointermove', handleMove, true);
     window.removeEventListener('pointerup', handleUp, true);
     window.removeEventListener('pointercancel', handleCancel, true);
+    window.removeEventListener('blur', handleBlur);
   };
 };

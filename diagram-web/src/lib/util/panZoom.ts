@@ -2,6 +2,7 @@ import type { State } from '$/types';
 import Hammer from 'hammerjs';
 import type { Point } from 'mermaid/dist/types.js';
 import panzoom from 'svg-pan-zoom';
+import { setupCanvasShortcuts } from './canvasShortcuts';
 type PanZoom = typeof panzoom;
 
 export class PanZoomState {
@@ -10,8 +11,11 @@ export class PanZoomState {
   private pzoom: PanZoom | undefined;
   private isDirty = false;
   private resizeObserver: ResizeObserver;
+  private removeShortcuts?: () => void;
+  private initializing = false;
 
   public isPanEnabled: boolean;
+  public isSpacePanning = false;
   public onPanZoomChange?: (pan: Point, zoom: number) => void;
 
   constructor() {
@@ -25,7 +29,8 @@ export class PanZoomState {
   }
 
   public updateElement(diagramView: SVGElement, { pan, zoom }: Pick<State, 'pan' | 'zoom'>) {
-    this.pzoom?.destroy();
+    this.destroy();
+    this.initializing = true;
     let hammer: HammerManager | undefined;
     this.pzoom = panzoom(diagramView, {
       center: true,
@@ -37,7 +42,8 @@ export class PanZoomState {
           let initialScale = 1;
           let pannedX = 0;
           let pannedY = 0;
-          hammer = new Hammer(options.svgElement);
+          // Mouse panning belongs to svg-pan-zoom; Hammer handles touch only.
+          hammer = new Hammer(options.svgElement, { inputClass: Hammer.TouchInput });
 
           const resetPanned = () => {
             pannedX = 0;
@@ -51,6 +57,7 @@ export class PanZoomState {
 
           hammer.get('pinch').set({ enable: true });
           hammer.on('panstart panmove', function (event) {
+            if (!instance.isPanEnabled()) return;
             if (event.type === 'panstart') {
               resetPanned();
             }
@@ -61,14 +68,12 @@ export class PanZoomState {
               initialScale = instance.getZoom();
               resetPanned();
             }
+            const bounds = options.svgElement.getBoundingClientRect();
             instance.zoomAtPoint(initialScale * event.scale, {
-              x: event.center.x,
-              y: event.center.y
+              x: event.center.x - bounds.left,
+              y: event.center.y - bounds.top
             });
             handlePan(event);
-          });
-          options.svgElement.addEventListener('touchmove', function (event) {
-            event.preventDefault();
           });
         },
         destroy: function () {
@@ -79,6 +84,7 @@ export class PanZoomState {
       maxZoom: 12,
       minZoom: 0.2,
       onPan: (pan) => {
+        if (this.initializing) return;
         this.pan = pan;
         this.zoom = this.pzoom?.getZoom();
         this.isDirty = true;
@@ -87,6 +93,7 @@ export class PanZoomState {
         }
       },
       onZoom: (zoom) => {
+        if (this.initializing) return;
         this.zoom = zoom;
         this.pan = this.pzoom?.getPan();
         this.isDirty = true;
@@ -105,23 +112,19 @@ export class PanZoomState {
 
     if (pan && zoom && Number.isFinite(zoom) && Number.isFinite(pan.x) && Number.isFinite(pan.y)) {
       this.restorePanZoom(pan, zoom);
+      this.isDirty = true;
     } else {
       this.reset();
     }
 
-    // we start out with both pan and zoom enabled so that the tool can auto position view refreshed
-    // then set enable/disable pan based on state
-    if (this.isPanEnabled) {
-      this.pzoom.enablePan();
-      this.pzoom.enableZoom();
-    } else {
-      this.pzoom.disableZoom();
-      this.pzoom.disablePan();
-    }
-
-    if (pan === undefined && zoom === undefined) {
-      this.reset();
-    }
+    // Locking entity dragging must never disable wheel/pinch zoom on a new SVG.
+    this.setPanEnabled(this.isPanEnabled);
+    this.removeShortcuts = setupCanvasShortcuts(diagramView, (enabled) => {
+      this.isSpacePanning = enabled;
+    });
+    this.pan = this.pzoom.getPan();
+    this.zoom = this.pzoom.getZoom();
+    this.initializing = false;
   }
 
   public restorePanZoom(pan: Point, zoom: number) {
@@ -159,5 +162,13 @@ export class PanZoomState {
     // Zoom out a bit to avoid overlap with the toolbar
     this.pzoom?.zoom(0.875);
     this.isDirty = false;
+  }
+
+  public destroy(): void {
+    this.resizeObserver.disconnect();
+    this.removeShortcuts?.();
+    this.removeShortcuts = undefined;
+    this.pzoom?.destroy();
+    this.pzoom = undefined;
   }
 }

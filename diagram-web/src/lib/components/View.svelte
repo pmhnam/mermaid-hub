@@ -39,6 +39,7 @@
   let error = $state<Error | undefined>();
   let errorTimer: ReturnType<typeof setTimeout> | undefined;
   let hasRenderedDiagram = $state(false);
+  let disposed = false;
   let navigationMessage = $state('');
   let panZoom = true;
   let manualUpdate = true;
@@ -63,6 +64,7 @@
   };
 
   const handleStateChange = async (state: ValidatedState) => {
+    if (disposed) return;
     const startTime = Date.now();
     if (state.error !== undefined) {
       if (errorTimer) clearTimeout(errorTimer);
@@ -110,6 +112,7 @@
           rough: state.rough,
           viewId: uniqueID('graph-')
         });
+        if (disposed) return;
         diagramType = detectedDiagramType;
         code = nextCode;
         config = nextConfig;
@@ -133,6 +136,8 @@
         });
         if (graphDiv && state.panZoom) {
           handlePanZoom(state, graphDiv);
+        } else {
+          panZoomState.destroy();
         }
         if (view?.parentElement && scroll) {
           view.parentElement.scrollTop = scroll;
@@ -155,7 +160,13 @@
 
   onMount(() => {
     setupPanZoomObserver();
-    return () => removeVisualDragging?.();
+    return () => {
+      disposed = true;
+      if (errorTimer) clearTimeout(errorTimer);
+      removeVisualDragging?.();
+      panZoomState.destroy();
+      panZoomState.onPanZoomChange = undefined;
+    };
   });
 
   // Queue state changes to avoid race condition
@@ -167,7 +178,13 @@
   });
 
   const handleDoubleClick = (event: MouseEvent): void => {
-    if (!onSourceSelect || rough || !(event.target instanceof Element)) return;
+    if (
+      !onSourceSelect ||
+      rough ||
+      panZoomState.isSpacePanning ||
+      !(event.target instanceof Element)
+    )
+      return;
     const range = sourceRangeForSvgTarget(code, renderedDiagramType, event.target);
     if (!range) return;
     event.preventDefault();
@@ -191,7 +208,8 @@
   {#if onSourceSelect && !rough && hasRenderedDiagram}
     <div
       class="pointer-events-none absolute bottom-14 left-1/2 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-md border bg-background/90 px-2 py-1 text-center text-xs text-muted-foreground shadow-sm">
-      {editable ? 'Drag entities to move · ' : ''}Double-click a field or label to open source
+      {editable ? 'Drag entities to move · ' : ''}Scroll to zoom · Hold Space + drag to pan ·
+      Double-click to open source
     </div>
     <span class="sr-only" role="status">{navigationMessage}</span>
   {/if}
@@ -207,6 +225,14 @@
 </div>
 
 <style>
+  #view :global(svg.space-pan),
+  #view :global(svg.space-pan *) {
+    cursor: grab !important;
+  }
+  #view :global(svg.space-panning),
+  #view :global(svg.space-panning *) {
+    cursor: grabbing !important;
+  }
   .source-navigation :global([data-source-start]) {
     cursor: pointer;
   }

@@ -5,6 +5,7 @@
   import FontAwesome, { mayContainFontAwesome } from '$lib/components/FontAwesome.svelte';
   import uniqueID from 'lodash-es/uniqueId';
   import type { MermaidConfig } from 'mermaid';
+  import { onMount } from 'svelte';
 
   // Standalone, props-driven diagram canvas for the /embed widget.
   // Must never import the editor's state singleton: no localStorage, no URL
@@ -31,6 +32,11 @@
 
   let container: HTMLDivElement | undefined = $state();
   let error = $state<string | undefined>();
+  let disposed = false;
+  onMount(() => () => {
+    disposed = true;
+    panZoomState.destroy();
+  });
   let waitForFontAwesomeToLoad: FontAwesome['waitForFontAwesomeToLoad'] | undefined = $state();
 
   const renderDiagram = async (
@@ -40,7 +46,7 @@
     currentPan: { x: number; y: number } | undefined,
     currentZoom: number | undefined
   ) => {
-    if (!container) {
+    if (!container || disposed) {
       return;
     }
     try {
@@ -54,7 +60,7 @@
         rough: currentRough,
         viewId: uniqueID('embed-graph-')
       });
-      if (graphDiv) {
+      if (graphDiv && !disposed) {
         panZoomState.updateElement(graphDiv, { pan: currentPan, zoom: currentZoom });
       }
       error = undefined;
