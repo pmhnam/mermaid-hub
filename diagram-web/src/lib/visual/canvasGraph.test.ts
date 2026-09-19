@@ -36,6 +36,21 @@ describe('canvas operations', () => {
     expect(undone?.offsets).toEqual({ B: { x: 90, y: 90 }, C: { x: -10, y: 0 } });
     expect(undone && history.step(undone, true)?.offsets).toEqual({ ...current.offsets });
   });
+  it('undoes only local edge routes and preserves remote node/edge changes', () => {
+    const history = new LayoutHistory();
+    const before = emptyVisualLayout('elk');
+    const after = { ...before, edgeRoutes: { own: [{ x: 200, y: 100 }] } };
+    history.record(before, after);
+    const current = {
+      ...after,
+      edgeRoutes: { ...after.edgeRoutes, remote: [{ x: 30, y: 10 }] },
+      offsets: { A: { x: 10, y: 20 } }
+    };
+    const undone = history.step(current);
+    expect(undone?.edgeRoutes).toEqual({ remote: [{ x: 30, y: 10 }] });
+    expect(undone?.offsets).toEqual(current.offsets);
+    expect(undone && history.step(undone, true)?.edgeRoutes).toEqual(current.edgeRoutes);
+  });
   it('renames quoted ER identifiers without changing field comments or labels', () => {
     const code =
       'erDiagram\n"catalog.A" {\n text id "catalog.A"\n}\n"catalog.A" ||--o{ B : catalog.A';

@@ -73,10 +73,33 @@
           value
         ])
       );
+      const edgeRoutes = model.layout.edgeRoutes
+        ? Object.fromEntries(
+            Object.entries(model.layout.edgeRoutes).map(([key, points]) => {
+              try {
+                const parts: unknown = JSON.parse(key);
+                if (Array.isArray(parts) && parts.length === 3)
+                  return [
+                    JSON.stringify([
+                      parts[0] === oldName ? nextName : parts[0],
+                      parts[1] === oldName ? nextName : parts[1],
+                      parts[2]
+                    ]),
+                    points
+                  ];
+              } catch {
+                /* Keep keys from older documents intact. */
+              }
+              return [key, points];
+            })
+          )
+        : undefined;
       const applied = await model.editDocument({
         code,
         config: model.config,
-        ...(rename ? { visualLayout: { ...model.layout, offsets } } : {})
+        ...(rename
+          ? { visualLayout: { ...model.layout, ...(edgeRoutes ? { edgeRoutes } : {}), offsets } }
+          : {})
       });
       if (applied && rename) model.selected = [nextName];
     } catch (error) {
@@ -404,11 +427,18 @@
             >{model.focusDepth === 2 ? '1 level' : '2 levels'}</button
           ><button class="tool" onclick={() => model.focus(0)}>Show all</button>{/if}
         <button class="tool" onclick={() => open('properties')}>Properties</button>
+        {#if editable && model.selectedEdge}
+          <button class="tool" onclick={() => model.addEdgeBend()}>Add bend</button>
+          <button class="tool" onclick={() => model.resetEdgeRoute()}>Reset line</button>
+          <span class="hidden self-center text-xs text-muted-foreground sm:inline"
+            >Drag the blue handles · Delete removes a bend</span>
+        {/if}
         {#if onComment}<button class="tool" onclick={() => onComment?.(model.nodeIds[0])}
             >Comment</button
           >{/if}
       </div>
-      {#if editable && model.nodeIds.length > 1}<div class="flex flex-wrap gap-1">
+      {#if editable && model.nodeIds.length > 1 && !model.selectedEdge}<div
+          class="flex flex-wrap gap-1">
           {#each ['left', 'right', 'top', 'bottom', 'horizontal', 'vertical'] as alignment (alignment)}<button
               class="tool"
               aria-label={`Align ${alignment}`}
@@ -457,7 +487,22 @@
         model.menu = undefined;
       }}>Focus related</button>
     <button class="result" role="menuitem" onclick={() => open('properties')}>Properties</button>
-    {#if editable}<button
+    {#if editable && model.selectedEdge}<button
+        class="result"
+        role="menuitem"
+        onclick={() => {
+          model.addEdgeBend();
+          model.menu = undefined;
+        }}>Add bend</button
+      ><button
+        class="result"
+        role="menuitem"
+        onclick={() => {
+          model.resetEdgeRoute();
+          model.menu = undefined;
+        }}>Reset line</button
+      >{/if}
+    {#if editable && !model.selectedEdge}<button
         class="result"
         role="menuitem"
         onclick={() => {

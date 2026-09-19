@@ -6,11 +6,14 @@
   import uniqueID from 'lodash-es/uniqueId';
   import type { MermaidConfig } from 'mermaid';
   import { onMount } from 'svelte';
+  import { setupVisualDragging } from '$/visual/drag';
+  import { layoutEngineFromDocument, parseVisualLayout, type VisualLayout } from '$/visual/layout';
 
   // Standalone, props-driven diagram canvas for the /embed widget.
   // Must never import the editor's state singleton: no localStorage, no URL
   // rewriting, no analytics.
   let {
+    appearance,
     code,
     config,
     dark = false,
@@ -18,8 +21,10 @@
     pan,
     panZoomState,
     rough = false,
+    visualLayout,
     zoom
   }: {
+    appearance?: 'light' | 'dark';
     code: string;
     config: MermaidConfig;
     dark?: boolean;
@@ -27,6 +32,7 @@
     pan?: { x: number; y: number };
     panZoomState: PanZoomState;
     rough?: boolean;
+    visualLayout?: VisualLayout;
     zoom?: number;
   } = $props();
 
@@ -44,7 +50,9 @@
     currentConfig: MermaidConfig,
     currentRough: boolean,
     currentPan: { x: number; y: number } | undefined,
-    currentZoom: number | undefined
+    currentZoom: number | undefined,
+    currentAppearance: 'light' | 'dark' | undefined,
+    currentLayout: VisualLayout | undefined
   ) => {
     if (!container || disposed) {
       return;
@@ -53,7 +61,8 @@
       if (mayContainFontAwesome(currentCode)) {
         await waitForFontAwesomeToLoad?.();
       }
-      const { graphDiv } = await renderAndPlaceDiagram({
+      const { diagramType, graphDiv } = await renderAndPlaceDiagram({
+        appearance: currentAppearance,
         code: currentCode,
         config: currentConfig,
         container,
@@ -61,6 +70,15 @@
         viewId: uniqueID('embed-graph-')
       });
       if (graphDiv && !disposed) {
+        setupVisualDragging({
+          diagramType,
+          editable: false,
+          engine: layoutEngineFromDocument(currentCode, currentConfig),
+          layout: parseVisualLayout(currentLayout),
+          panZoomState,
+          rough: currentRough,
+          svg: graphDiv
+        });
         panZoomState.updateElement(graphDiv, { pan: currentPan, zoom: currentZoom });
       }
       error = undefined;
@@ -81,13 +99,23 @@
     const currentRough = rough;
     const currentPan = pan;
     const currentZoom = zoom;
+    const currentAppearance = appearance;
+    const currentLayout = visualLayout;
     void container;
     const seq = ++renderSeq;
     pendingRender = pendingRender.then(() => {
       if (seq !== renderSeq) {
         return;
       }
-      return renderDiagram(currentCode, currentConfig, currentRough, currentPan, currentZoom);
+      return renderDiagram(
+        currentCode,
+        currentConfig,
+        currentRough,
+        currentPan,
+        currentZoom,
+        currentAppearance,
+        currentLayout
+      );
     });
   });
 </script>

@@ -57,6 +57,17 @@ const numericAttribute = (value: string | null): number | undefined => {
 };
 
 export const getSvgDimensions = (svgElement: SVGSVGElement): SvgDimensions => {
+  const viewport = svgElement.querySelector<SVGGraphicsElement>('.svg-pan-zoom_viewport');
+  if (viewport && typeof viewport.getBBox === 'function') {
+    const bounds = viewport.getBBox();
+    if (bounds.width > 0 && bounds.height > 0)
+      return {
+        height: bounds.height + 32,
+        minX: bounds.x - 16,
+        minY: bounds.y - 16,
+        width: bounds.width + 32
+      };
+  }
   const viewBox = (svgElement.getAttribute('viewBox') ?? '').trim().split(/[ ,]+/).map(Number);
   if (viewBox.length === 4 && viewBox.every(Number.isFinite) && viewBox[2] > 0 && viewBox[3] > 0) {
     return { height: viewBox[3], minX: viewBox[0], minY: viewBox[1], width: viewBox[2] };
@@ -80,6 +91,7 @@ export const serializeDiagramSvg = (
   forceWhite = false
 ): string => {
   const clone = svgElement.cloneNode(true) as SVGSVGElement;
+  clone.querySelectorAll('[data-canvas-overlay]').forEach((element) => element.remove());
   const dimensions = getSvgDimensions(svgElement);
   const color = resolveBackground(background, forceWhite);
 

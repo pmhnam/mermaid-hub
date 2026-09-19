@@ -118,4 +118,22 @@ describe('visual layout', () => {
     node.setAttribute('id', 'entity-CUSTOMER-0');
     expect(visualNodeKey(node)).toBe('CUSTOMER');
   });
+  it('round-trips relationship bends and discards malformed routes', () => {
+    const points = [
+      { x: -120, y: 200 },
+      { x: 10, y: 300 }
+    ];
+    const parsed = parseVisualLayout({
+      engine: 'elk',
+      mode: 'manual',
+      offsets: {},
+      edgeRoutes: {
+        valid: points,
+        invalid: [{ x: Infinity, y: 0 }],
+        empty: [],
+        oversized: Array.from({ length: 33 }, () => ({ x: 1, y: 1 }))
+      }
+    });
+    expect(parsed?.edgeRoutes).toEqual({ valid: points });
+  });
 });

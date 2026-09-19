@@ -21,7 +21,7 @@
     panZoomState: PanZoomState;
   } = $props();
 
-  const zoomClass = $derived(compact ? undefined : 'hidden sm:block');
+  const zoomClass = $derived(compact ? 'size-8' : 'hidden sm:block');
   let percent = $state(100);
   let enabled = $state(false);
   let hasSelection = $state(false);
@@ -35,13 +35,18 @@
   );
 </script>
 
-<FloatingToolbar>
-  <Button variant="ghost" size="icon" title="Reset view" onclick={() => panZoomState.reset()}>
+<FloatingToolbar {compact}>
+  <Button
+    variant="ghost"
+    size="icon"
+    class={compact ? 'size-8' : undefined}
+    title="Reset view"
+    onclick={() => panZoomState.reset()}>
     <ArrowsToCircleIcon />
   </Button>
   <Popover.Root>
     <Popover.Trigger
-      class="rounded px-1 text-xs tabular-nums hover:bg-accent"
+      class="h-8 min-w-11 rounded px-1 text-xs tabular-nums hover:bg-accent"
       disabled={!enabled}
       aria-label="Zoom options">{percent}%</Popover.Trigger>
     <Popover.Content class="w-44 space-y-2 p-2">
@@ -86,8 +91,14 @@
     <MagnifyingGlassPlusIcon />
   </Button>
   {#if fullScreenHref}
-    <Separator orientation="vertical" class={zoomClass} />
-    <Button variant="ghost" size="icon" title="Full Screen" href={fullScreenHref} target="_blank">
+    <Separator orientation="vertical" class={compact ? undefined : 'hidden sm:block'} />
+    <Button
+      variant="ghost"
+      size="icon"
+      class={compact ? 'size-8' : undefined}
+      title="Full Screen"
+      href={fullScreenHref}
+      target="_blank">
       <ExpandIcon />
     </Button>
   {/if}

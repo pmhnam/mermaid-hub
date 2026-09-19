@@ -9,6 +9,7 @@ export interface VisualLayoutOffset {
 }
 
 export interface VisualLayout {
+  edgeRoutes?: Record<string, VisualLayoutOffset[]>;
   engine: LayoutEngine;
   mode: 'auto' | 'manual';
   offsets: Record<string, VisualLayoutOffset>;
@@ -123,7 +124,24 @@ export const parseVisualLayout = (value: unknown): VisualLayout | undefined => {
   const offsets = Object.fromEntries(
     Object.entries(layout.offsets).filter(([, offset]) => isOffset(offset))
   ) as Record<string, VisualLayoutOffset>;
-  return { engine: layout.engine, mode: layout.mode, offsets };
+  const edgeRoutes =
+    layout.edgeRoutes && typeof layout.edgeRoutes === 'object'
+      ? Object.fromEntries(
+          Object.entries(layout.edgeRoutes).filter(
+            ([, points]) =>
+              Array.isArray(points) &&
+              points.length > 0 &&
+              points.length <= 32 &&
+              points.every(isOffset)
+          )
+        )
+      : undefined;
+  return {
+    ...(edgeRoutes ? { edgeRoutes } : {}),
+    engine: layout.engine,
+    mode: layout.mode,
+    offsets
+  };
 };
 
 const nodePrefixes = ['classId-', 'entity-', 'flowchart-', 'requirement-', 'state-'];

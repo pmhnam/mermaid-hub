@@ -6,6 +6,7 @@
   import { PanZoomState } from '$/util/panZoom';
   import { createVersionDiff } from './version-diff';
   import type { DiagramVersion } from './types';
+  import { mode } from 'mode-watcher';
   let {
     open = $bindable(),
     versions,
@@ -102,7 +103,13 @@
               onclick={() => (tab = 'preview')}>Diagram preview</Button>
           </div>
           {#if tab === 'preview'}<div class="min-h-0 flex-1 bg-background">
-              <EmbedView code={selected.content} config={configuration} panZoomState={camera} />
+              <EmbedView
+                code={selected.content}
+                config={configuration}
+                panZoomState={camera}
+                appearance={mode.current}
+                visualLayout={selected.visualLayout ?? undefined}
+                dark={mode.current === 'dark'} />
             </div>
           {:else}<div class="min-h-0 flex-1 space-y-4 overflow-auto p-4">
               {#each [{ title: 'Diagram source', parts: diff.content }, { title: 'Configuration', parts: diff.config }] as section (section.title)}<div>

@@ -1,6 +1,7 @@
 import type { MermaidConfig } from 'mermaid';
 import { Svg2Roughjs } from 'svg2roughjs';
 import { render as renderDiagram } from './mermaid';
+import { diagramForAppearance } from './diagramAppearance';
 
 export interface PlacedDiagram {
   diagramType?: string;
@@ -16,12 +17,14 @@ export interface PlacedDiagram {
  *   mermaid returned an empty render).
  */
 export const renderAndPlaceDiagram = async ({
+  appearance,
   code,
   config,
   container,
   rough,
   viewId
 }: {
+  appearance?: 'light' | 'dark';
   code: string;
   config: MermaidConfig;
   /** Must have an `id` — Svg2Roughjs addresses the container by CSS selector. */
@@ -31,7 +34,12 @@ export const renderAndPlaceDiagram = async ({
 }): Promise<PlacedDiagram> => {
   const containerSelector = `#${container.id}`;
   delete container.dataset.processed;
-  const { svg, bindFunctions, diagramType } = await renderDiagram(config, code, viewId);
+  const rendered = diagramForAppearance(code, config, appearance);
+  const { svg, bindFunctions, diagramType } = await renderDiagram(
+    rendered.config,
+    rendered.code,
+    viewId
+  );
   if (svg.length === 0) {
     return { diagramType };
   }

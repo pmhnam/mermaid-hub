@@ -12,11 +12,12 @@
   import uniqueID from 'lodash-es/uniqueId';
   import type { MermaidConfig } from 'mermaid';
   import { mode } from 'mode-watcher';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { setupVisualDragging } from '$/visual/drag';
   import { layoutEngineFromDocument, type VisualLayout } from '$/visual/layout';
   import CanvasTools from './CanvasTools.svelte';
   import { CanvasModel, type CanvasDocument } from '$/visual/canvasModel.svelte';
+  import { previewErEdges } from '$/visual/erEdges';
 
   let {
     onSourceSelect,
@@ -51,6 +52,8 @@
   let manualUpdate = true;
   let renderedDiagramType = '';
   let visualLayoutKey = '';
+  let renderedLayout: VisualLayout | undefined;
+  let renderedAppearance: 'light' | 'dark' | undefined;
   let removeVisualDragging: (() => void) | undefined;
   let waitForFontAwesomeToLoad: FontAwesome['waitForFontAwesomeToLoad'] | undefined = $state();
   const canvas = new CanvasModel(() => panZoomState, {
@@ -73,6 +76,10 @@
     layout: (layout) => onVisualLayoutChange?.(layout),
     source: (range) => onSourceSelect?.(range)
   });
+  $effect(() => {
+    void editable;
+    untrack(() => canvas.syncSelection());
+  });
 
   // Set up panZoom state observer to update the store when pan/zoom changes
   const setupPanZoomObserver = () => {
@@ -89,7 +96,7 @@
     }
   };
 
-  const handleStateChange = async (state: ValidatedState) => {
+  const handleStateChange = async (state: ValidatedState, appearance: 'light' | 'dark') => {
     if (disposed) return;
     const startTime = Date.now();
     if (state.error !== undefined) {
@@ -113,18 +120,46 @@
           config === state.mermaid &&
           rough === state.rough &&
           panZoom === state.panZoom &&
+          renderedAppearance === appearance &&
           visualLayoutKey === JSON.stringify(currentVisualLayout ?? null)
         ) {
           return;
         }
 
-        if (!shouldRefreshView()) {
+        // Bending an edge only changes its path. Keep the SVG, camera, focus and
+        // editor intact instead of running Mermaid's automatic layout again.
+        if (
+          renderedDiagramType.startsWith('er') &&
+          canvas.svg &&
+          currentVisualLayout &&
+          code === state.code &&
+          config === state.mermaid &&
+          rough === state.rough &&
+          panZoom === state.panZoom &&
+          renderedAppearance === appearance &&
+          currentVisualLayout.engine === layoutEngineFromDocument(code, config) &&
+          JSON.stringify(currentVisualLayout.offsets) ===
+            JSON.stringify(renderedLayout?.offsets ?? {})
+        ) {
+          previewErEdges(canvas.svg, currentVisualLayout);
+          canvas.layout = currentVisualLayout;
+          canvas.syncSelection();
+          renderedLayout = currentVisualLayout;
+          visualLayoutKey = JSON.stringify(currentVisualLayout);
+          return;
+        }
+
+        if (renderedAppearance === appearance && !shouldRefreshView()) {
           return;
         }
 
         const nextCode = state.code;
         const nextConfig = state.mermaid;
         const nextPanZoom = state.panZoom ?? true;
+        const appearanceViewport =
+          renderedAppearance !== appearance && code === nextCode && config === nextConfig
+            ? panZoomState.snapshot()
+            : undefined;
 
         if (mayContainFontAwesome(nextCode)) {
           await waitForFontAwesomeToLoad?.();
@@ -132,6 +167,7 @@
 
         const scroll = view?.parentElement?.scrollTop;
         const { diagramType: detectedDiagramType, graphDiv } = await renderAndPlaceDiagram({
+          appearance,
           code: nextCode,
           config: JSON.parse(nextConfig) as MermaidConfig,
           container,
@@ -144,6 +180,7 @@
         config = nextConfig;
         rough = state.rough;
         panZoom = nextPanZoom;
+        renderedAppearance = appearance;
         hasRenderedDiagram = true;
         renderedDiagramType = detectedDiagramType ?? '';
         if (graphDiv && detectedDiagramType) {
@@ -157,6 +194,7 @@
           diagramType: detectedDiagramType,
           editable,
           engine: layoutEngineFromDocument(nextCode, nextConfig),
+          getLayout: () => canvas.layout,
           layout: currentVisualLayout,
           onChange: (layout) => canvas.commitLayout(layout),
           onGuides: (guides) => {
@@ -170,6 +208,7 @@
         });
         if (graphDiv && state.panZoom) {
           handlePanZoom(state, graphDiv);
+          if (appearanceViewport) panZoomState.restoreViewport(appearanceViewport);
         } else {
           panZoomState.destroy();
         }
@@ -178,6 +217,7 @@
           view.parentElement.scrollTop = scroll;
         }
         visualLayoutKey = JSON.stringify(currentVisualLayout ?? null);
+        renderedLayout = currentVisualLayout;
         error = undefined;
       } else if (manualUpdate) {
         manualUpdate = false;
@@ -209,8 +249,10 @@
   let pendingStateChange = Promise.resolve();
   $effect(() => {
     const state = validatedState.current;
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    pendingStateChange = pendingStateChange.then(() => handleStateChange(state).catch(() => {}));
+    const appearance = mode.current === 'dark' ? 'dark' : 'light';
+    pendingStateChange = pendingStateChange.then(() =>
+      handleStateChange(state, appearance).catch(() => undefined)
+    );
   });
 
   const handleDoubleClick = (event: MouseEvent): void => {
@@ -296,7 +338,8 @@
   #view :global(path.canvas-selected),
   #view :global(path.canvas-related) {
     stroke: #0284c7 !important;
-    stroke-width: 3px !important;
+    /* ER cardinality markers scale with stroke width; highlight without enlarging them. */
+    filter: drop-shadow(0 0 1px #0284c7);
   }
   #view :global(.canvas-dimmed) {
     opacity: 0.16;

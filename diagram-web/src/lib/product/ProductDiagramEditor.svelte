@@ -37,7 +37,7 @@
     updateCodeStore,
     validatedState
   } from '$lib/util/state.svelte';
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import CodeIcon from '~icons/custom/code';
   import DownloadIcon from '~icons/material-symbols/download';
   import FullscreenIcon from '~icons/material-symbols/fullscreen-rounded';
@@ -75,8 +75,14 @@
     editorOpen = !editorOpen;
   };
   $effect(() => {
-    if (!codePane) return;
-    codePane.resize(isMobile ? (mobilePanel === 'editor' ? 100 : 0) : editorOpen ? editorSize : 0);
+    const pane = codePane;
+    const mobile = isMobile;
+    const panel = mobilePanel;
+    const open = editorOpen;
+    if (!pane) return;
+    // Pane.resize reads its internal reactive layout. Tracking those reads would
+    // run this effect on every drag and immediately restore the previous size.
+    untrack(() => pane.resize(mobile ? (panel === 'editor' ? 100 : 0) : open ? editorSize : 0));
   });
   let previewElement = $state<HTMLElement | null>(null);
   let exportSvgElement = $state<SVGSVGElement | null>(null);
@@ -455,8 +461,9 @@
           cursors={previewCursors}
           revision={previewRevision} />
       {/if}
-      <div class="absolute top-3 right-3 flex items-start gap-2">
+      <div class="absolute top-3 right-3 flex items-center gap-2" data-testid="preview-toolbar">
         <LayoutToolbar
+          compact
           code={currentContent}
           config={currentConfig}
           diagramType={validatedState.current.diagramType}
@@ -464,7 +471,7 @@
           onChange={updateCollaborativeLayout} />
         <PanZoomToolbar {panZoomState} compact />
         <Button
-          class="border border-slate-200 bg-white shadow-sm hover:bg-slate-100"
+          class="size-10 border bg-background text-foreground shadow-sm hover:bg-accent"
           variant="ghost"
           size="icon"
           title="Full screen"
@@ -473,7 +480,7 @@
       </div>
       {#if !isMobile}
         <Button
-          class="absolute top-3 left-3 border bg-background shadow-sm hover:bg-accent"
+          class="absolute top-3 left-3 h-10 border bg-background shadow-sm hover:bg-accent"
           variant="ghost"
           size="sm"
           aria-expanded={editorOpen}
@@ -497,10 +504,16 @@
         <Resizable.Pane
           bind:this={codePane}
           defaultSize={36}
+          onResize={(size) => {
+            if (!isMobile && size > 0) editorSize = size;
+          }}
           minSize={isMobile ? 0 : 22}
           collapsible
           collapsedSize={0}>{@render editorPanel()}</Resizable.Pane>
-        <Resizable.Handle withHandle class={isMobile || !editorOpen ? 'hidden' : ''} />
+        <Resizable.Handle
+          withHandle
+          aria-label="Resize code editor"
+          class={isMobile || !editorOpen ? 'hidden' : 'cursor-col-resize after:w-3'} />
         <Resizable.Pane minSize={isMobile ? 0 : 35}>{@render previewPanel()}</Resizable.Pane>
       </Resizable.PaneGroup>
     </div>

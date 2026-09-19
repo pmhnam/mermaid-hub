@@ -15,12 +15,14 @@
     config,
     code,
     diagramType,
+    compact = false,
     disabled = false,
     onChange
   }: {
     config: string;
     code: string;
     diagramType?: string;
+    compact?: boolean;
     disabled?: boolean;
     onChange: (engine: LayoutEngine) => void;
   } = $props();
@@ -60,10 +62,12 @@
         : 'Choose automatic layout'}
     class={cn(
       buttonVariants({ variant: 'outline', size: 'sm' }),
-      'h-8 gap-1.5 bg-background px-2 shadow-sm'
+      'gap-1.5 bg-background px-2 shadow-sm',
+      compact ? 'h-10' : 'h-8'
     )}>
     <AccountTreeIcon />
-    <span>{selected === 'elk' ? 'Adaptive' : 'Hierarchical'}</span>
+    <span class={compact ? 'hidden sm:inline' : undefined}
+      >{selected === 'elk' ? 'Adaptive' : 'Hierarchical'}</span>
     <KeyboardArrowDownIcon class="size-4" />
   </Popover.Trigger>
   <Popover.Content side="top" align="start" class="w-72 max-w-[calc(100vw-2rem)] p-1">

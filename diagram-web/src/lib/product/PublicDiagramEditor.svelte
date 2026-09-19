@@ -383,8 +383,9 @@
             cursors={previewCursors}
             revision={previewRevision} />
         {/if}
-        <div class="absolute top-3 right-3 flex items-start gap-2">
+        <div class="absolute top-3 right-3 flex items-center gap-2" data-testid="preview-toolbar">
           <LayoutToolbar
+            compact
             code={validatedState.current.code}
             config={validatedState.current.mermaid}
             diagramType={validatedState.current.diagramType}
@@ -392,7 +393,7 @@
             onChange={updateCollaborativeLayout} />
           <PanZoomToolbar {panZoomState} compact />
           <Button
-            class="border border-slate-200 bg-white shadow-sm hover:bg-slate-100"
+            class="size-10 border bg-background text-foreground shadow-sm hover:bg-accent"
             variant="ghost"
             size="icon"
             title="Full screen"
@@ -400,7 +401,7 @@
             onclick={enterFullscreen}><FullscreenIcon /></Button>
         </div>
         {#if !isMobile}<Button
-            class="absolute top-3 left-3 border bg-background"
+            class="absolute top-3 left-3 h-10 border bg-background"
             variant="ghost"
             size="sm"
             aria-expanded={editorOpen}
@@ -419,10 +420,10 @@
           cursors={previewCursors}
           revision={previewRevision} />
       {/if}
-      <div class="absolute top-3 right-3 flex items-start gap-2">
+      <div class="absolute top-3 right-3 flex items-center gap-2" data-testid="preview-toolbar">
         <PanZoomToolbar {panZoomState} compact />
         <Button
-          class="border border-slate-200 bg-white shadow-sm hover:bg-slate-100"
+          class="size-10 border bg-background text-foreground shadow-sm hover:bg-accent"
           variant="ghost"
           size="icon"
           title="Full screen"

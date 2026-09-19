@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 test('preserves the rendered canvas on editor toggle and supports themes, versions and comments', async ({
-  page
+  page,
+  browser
 }, testInfo) => {
   const registration = await page.request.post('/api/auth/register', {
     data: {
@@ -64,6 +65,58 @@ test('preserves the rendered canvas on editor toggle and supports themes, versio
   await page.screenshot({ animations: 'disabled', path: testInfo.outputPath('share-light.png') });
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
 
+  await svg.locator('.edgeLabel').first().click();
+  const bend = svg.getByRole('button', { name: 'Relationship bend 1', exact: true });
+  const handle = await bend.boundingBox();
+  if (!handle) throw new Error('Missing relationship handle');
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 80, handle.y + handle.height / 2 + 20, {
+    steps: 10
+  });
+  await page.mouse.up();
+  const relationship = svg.locator('path[data-et="edge"]').first();
+  await expect(relationship).toHaveAttribute('d', /Q/);
+  const routedPath = await relationship.getAttribute('d');
+  await expect
+    .poll(async () => {
+      const saved = await (
+        await page.request.get(`/api/diagrams/${diagram.id}`, { headers })
+      ).json();
+      return Object.keys(saved.visualLayout?.edgeRoutes ?? {}).length;
+    })
+    .toBe(1);
+  const shared = await (
+    await page.request.put(`/api/diagrams/${diagram.id}/public-link`, {
+      headers,
+      data: { mode: 'public_read' }
+    })
+  ).json();
+  const guest = await browser.newContext();
+  try {
+    const viewer = await guest.newPage();
+    await viewer.goto(`/share#${shared.shareToken}`);
+    await expect(
+      viewer.getByText('Public view link, live and read only', { exact: true })
+    ).toBeVisible();
+    const publicSvg = viewer.locator('#container svg.erDiagram');
+    await expect(publicSvg.locator('path[data-et="edge"]').first()).toHaveAttribute('d', /Q/);
+    await publicSvg.locator('.edgeLabel').first().click();
+    await expect(publicSvg.locator('[data-edge-bend]')).toHaveCount(0);
+    await expect(viewer.getByRole('button', { name: 'Add bend', exact: true })).toHaveCount(0);
+  } finally {
+    await guest.close();
+  }
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const previewSource = await dialog
+    .getByRole('img', { name: 'Export preview of Canvas review' })
+    .getAttribute('src');
+  const exported = decodeURIComponent(previewSource?.split(',').slice(1).join(',') ?? '');
+  expect(exported).not.toContain('data-canvas-overlay');
+  expect(exported).toContain(routedPath ?? 'missing-route');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+
+  const lightDiagramId = await svg.getAttribute('id');
   await page.getByRole('button', { name: 'Versions', exact: true }).click();
   await page.getByLabel('Version note', { exact: true }).fill('Canvas checkpoint');
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
@@ -72,8 +125,13 @@ test('preserves the rendered canvas on editor toggle and supports themes, versio
   await page.screenshot({ animations: 'disabled', path: testInfo.outputPath('versions.png') });
   await dialog.getByRole('button', { name: 'Diagram preview', exact: true }).click();
   await expect(dialog.locator('#embed-container svg')).toBeVisible();
+  await expect(dialog.locator('#embed-container path[data-et="edge"]').first()).toHaveAttribute(
+    'd',
+    /Q/
+  );
+  await expect(dialog.locator('[data-edge-bend]')).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-  await expect(svg).toHaveAttribute('id', id ?? '');
+  await expect(svg).toHaveAttribute('id', lightDiagramId ?? '');
 
   await page.getByRole('button', { name: 'Comments', exact: true }).click();
   await dialog.getByLabel('Comment', { exact: true }).fill('Please review the SKU key.');
@@ -82,6 +140,7 @@ test('preserves the rendered canvas on editor toggle and supports themes, versio
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await page.reload();
   await expect(page.locator('html')).not.toHaveClass(/dark/);
+  await expect(svg.locator('path[data-et="edge"]').first()).toHaveAttribute('d', /Q/);
   await page.getByRole('button', { name: 'Comments', exact: true }).click();
   await expect(dialog.getByText('Please review the SKU key.', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Resolve', exact: true }).click();

@@ -12,6 +12,7 @@ import {
 } from './layout';
 
 interface DragOptions {
+  getLayout?: () => VisualLayout;
   selection?: (key: string) => string[];
   snap?: () => boolean;
   onGuides?: (guides: { x?: number; y?: number }) => void;
@@ -64,6 +65,7 @@ export const setupVisualDragging = ({
   diagramType,
   editable,
   engine,
+  getLayout,
   layout: currentLayout,
   onChange,
   panZoomState,
@@ -92,7 +94,7 @@ export const setupVisualDragging = ({
       node.setAttribute('transform', visualTransform(baseTransform, layout.offsets[key]));
     }
   }
-  updateEdges?.(layout.offsets);
+  updateEdges?.(layout.offsets, layout.edgeRoutes);
   if (!editable || !onChange) return () => undefined;
 
   let active: ActiveDrag | undefined;
@@ -114,6 +116,7 @@ export const setupVisualDragging = ({
     const key = element?.getAttribute('data-visual-node');
     const start = pointFromEvent(svg, event);
     if (!element || !key || !start) return;
+    layout = getLayout?.() ?? layout;
     event.stopPropagation();
     const keys = selection?.(key) ?? [key];
     const bounds = elementBounds(element, panZoomState.viewport() ?? svg);
@@ -175,7 +178,7 @@ export const setupVisualDragging = ({
         visualTransform(node.baseTransform, offsets[node.key])
       );
     }
-    updateEdges?.(offsets);
+    updateEdges?.(offsets, layout.edgeRoutes);
   };
   const finish = (event: PointerEvent | undefined, commit: boolean): void => {
     if (!active || (event && active.pointerId !== event.pointerId)) return;
@@ -191,11 +194,11 @@ export const setupVisualDragging = ({
     if (!commit || !point) {
       for (const node of drag.group)
         node.element.setAttribute('transform', visualTransform(node.baseTransform, node.offset));
-      updateEdges?.(layout.offsets);
+      updateEdges?.(layout.offsets, layout.edgeRoutes);
       return;
     }
     layout = {
-      engine: layout.engine,
+      ...layout,
       mode: 'manual',
       offsets: {
         ...layout.offsets,

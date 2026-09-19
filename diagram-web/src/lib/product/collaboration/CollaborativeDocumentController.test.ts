@@ -44,6 +44,28 @@ class FakeProvider {
 }
 
 describe('CollaborativeDocumentController', () => {
+  it('keeps relationship routes through collaboration updates and clears them on auto-layout', () => {
+    const controller = new CollaborativeDocumentController({
+      apiBaseUrl: '',
+      browserOrigin: 'https://app.example.test',
+      diagramId: 'diagram-1',
+      getTicket: vi.fn(),
+      user: { displayName: 'Ada', id: 'user-1' }
+    });
+    const layout = {
+      edgeRoutes: { '["A","B",0]': [{ x: 120, y: 100 }] },
+      engine: 'elk' as const,
+      mode: 'manual' as const,
+      offsets: {}
+    };
+    controller.setVisualLayout(layout);
+    expect(controller.getVisualLayout()).toEqual(layout);
+    controller.setDocumentAndVisualLayout('erDiagram\nA ||--o{ B : has', '{}', layout);
+    expect(controller.getVisualLayout()).toEqual(layout);
+    controller.setVisualLayout({ engine: 'elk', mode: 'auto', offsets: {} });
+    expect(controller.getVisualLayout()?.edgeRoutes).toBeUndefined();
+    controller.destroy();
+  });
   it('updates code, config, and visual layout in one transaction', () => {
     const controller = new CollaborativeDocumentController({
       apiBaseUrl: 'https://api.example.test',

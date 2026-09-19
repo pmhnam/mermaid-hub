@@ -107,6 +107,13 @@ export class PanZoomState {
     this.fitElements(this.selected);
   }
 
+  public restoreViewport(view: CanvasViewport): void {
+    if (!this.pzoom) return;
+    const base = this.pzoom.getSizes().realZoom / this.pzoom.getZoom();
+    this.pzoom.zoom(view.percent / 100 / base);
+    this.centerOn(view.bounds.x + view.bounds.width / 2, view.bounds.y + view.bounds.height / 2);
+  }
+
   public isPanEnabled: boolean;
   public isSpacePanning = false;
   public onPanZoomChange?: (pan: Point, zoom: number) => void;

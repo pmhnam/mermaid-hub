@@ -19,6 +19,7 @@ import {
   type VisualLayout
 } from './layout';
 import { LayoutHistory } from './layoutHistory';
+import { EdgeControls } from './edgeControls';
 
 export interface CanvasDocument {
   code: string;
@@ -50,6 +51,7 @@ export class CanvasModel {
   private documents: { before: CanvasDocument; after: CanvasDocument }[] = [];
   private documentRedo: { before: CanvasDocument; after: CanvasDocument }[] = [];
   private cleanup?: () => void;
+  private edgeControls?: EdgeControls;
   constructor(
     private readonly getCamera: () => PanZoomState,
     private readonly options: {
@@ -71,6 +73,7 @@ export class CanvasModel {
     layout?: VisualLayout
   ): void {
     this.cleanup?.();
+    this.edgeControls?.destroy();
     const engine = layoutEngineFromDocument(code, config);
     if (this.layout.engine !== engine) {
       this.history.clear();
@@ -85,6 +88,14 @@ export class CanvasModel {
     this.svg = svg;
     this.layout = layout ?? emptyVisualLayout(engine);
     this.graph = buildCanvasGraph(svg, code, type);
+    this.edgeControls = new EdgeControls(svg, this.camera, {
+      change: (next) => this.commitLayout(next),
+      editable: this.options.editable,
+      layout: () => this.layout,
+      selection: () => this.selectedEdge,
+      snap: () => this.snap,
+      source: () => this.source()
+    });
     this.selected = this.selected.filter((id) => this.graph.items.some((item) => item.id === id));
     this.refresh();
     let start: { x: number; y: number } | undefined;
@@ -192,10 +203,23 @@ export class CanvasModel {
   get selection(): CanvasItem[] {
     return this.graph.items.filter((item) => this.selected.includes(item.id));
   }
+  get selectedEdge(): { path: SVGPathElement; key: string } | undefined {
+    if (!this.type.startsWith('er') || this.selection.length !== 1) return;
+    const element = this.selection[0].elements[0];
+    const key = element?.dataset.erRouteKey;
+    if (key && element instanceof SVGPathElement) return { key, path: element };
+  }
+  addEdgeBend(): void {
+    this.edgeControls?.addBend();
+  }
+  resetEdgeRoute(): void {
+    this.edgeControls?.reset();
+  }
   get nodeIds(): string[] {
     return [...new SvelteSet(this.selection.flatMap((item) => item.nodeIds))];
   }
   select(id?: string, additive = false): void {
+    if (!additive && this.selected.length === 1 && this.selected[0] === id) return;
     this.selected = id
       ? additive
         ? this.selected.includes(id)
@@ -249,13 +273,20 @@ export class CanvasModel {
     );
     this.canUndo = this.past.length > 0;
     this.canRedo = this.future.length > 0;
+    this.edgeControls?.refresh();
   }
   syncSelection(): void {
     this.refresh();
   }
   dragKeys(key: string): string[] {
-    if (!this.nodeIds.includes(key)) this.select(key);
-    return this.nodeIds;
+    const nodes = this.selection
+      .filter((item) => item.kind !== 'edge')
+      .flatMap((item) => item.nodeIds);
+    if (!nodes.includes(key)) {
+      this.select(key);
+      return [key];
+    }
+    return [...new SvelteSet(nodes)];
   }
   commitLayout(layout: VisualLayout, record = true): void {
     if (!this.options.editable()) return;
@@ -266,6 +297,7 @@ export class CanvasModel {
   }
   undo(redo = false): void {
     if (!this.options.editable()) return;
+    if (this.edgeControls?.cancelActive()) return;
     const kind = (redo ? this.future : this.past).pop();
     let applied = false;
     if (kind === 'document') {
@@ -277,7 +309,9 @@ export class CanvasModel {
           !expected.visualLayout ||
           (this.layout.engine === expected.visualLayout.engine &&
             JSON.stringify(Object.entries(this.layout.offsets).sort()) ===
-              JSON.stringify(Object.entries(expected.visualLayout.offsets).sort()));
+              JSON.stringify(Object.entries(expected.visualLayout.offsets).sort()) &&
+            JSON.stringify(Object.entries(this.layout.edgeRoutes ?? {}).sort()) ===
+              JSON.stringify(Object.entries(expected.visualLayout.edgeRoutes ?? {}).sort()));
         if (
           layoutMatches &&
           this.code === expected.code &&
@@ -386,6 +420,8 @@ export class CanvasModel {
   destroy(): void {
     this.cleanup?.();
     this.cleanup = undefined;
+    this.edgeControls?.destroy();
+    this.edgeControls = undefined;
     this.camera.setSelection([]);
   }
 }

@@ -15,8 +15,10 @@ export const routeErRelationship = (
   from: EntityBounds,
   to: EntityBounds,
   lane = 0,
-  self = false
+  self = false,
+  waypoints: Point[] = []
 ): Point[] => {
+  if (waypoints.length) return routeThroughWaypoints(from, to, waypoints, self);
   const a = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
   const b = { x: to.x + to.width / 2, y: to.y + to.height / 2 };
   const gapX = Math.abs(a.x - b.x) - (from.width + to.width) / 2;
@@ -50,7 +52,11 @@ export const routeErRelationship = (
     const x = Math.max(start.x, end.x) + 35 + Math.abs(lane);
     points = [start, { x, y: start.y }, { x, y: end.y }, end];
   }
-  // Remove repeated and collinear vertices before rounding corners.
+  return simplifyRoute(points);
+};
+
+// Remove repeated and collinear vertices before rounding corners.
+const simplifyRoute = (points: Point[]): Point[] => {
   const result: Point[] = [];
   for (const point of points) {
     const previous = result.at(-1);
@@ -70,6 +76,70 @@ export const routeErRelationship = (
     result.push(point);
   }
   return result;
+};
+
+const portTowards = (box: EntityBounds, target: Point): { point: Point; direction: Point } => {
+  const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const dx = target.x - center.x,
+    dy = target.y - center.y;
+  const clamp = (value: number, start: number, size: number): number => {
+    const padding = Math.min(12, size / 4);
+    return Math.max(start + padding, Math.min(start + size - padding, value));
+  };
+  if (Math.abs(dx) / Math.max(box.width, 1) >= Math.abs(dy) / Math.max(box.height, 1)) {
+    const sign = dx >= 0 ? 1 : -1;
+    return {
+      direction: { x: sign, y: 0 },
+      point: { x: center.x + (sign * box.width) / 2, y: clamp(target.y, box.y, box.height) }
+    };
+  }
+  const sign = dy >= 0 ? 1 : -1;
+  return {
+    direction: { x: 0, y: sign },
+    point: { x: clamp(target.x, box.x, box.width), y: center.y + (sign * box.height) / 2 }
+  };
+};
+
+const routeThroughWaypoints = (
+  from: EntityBounds,
+  to: EntityBounds,
+  waypoints: Point[],
+  self: boolean
+): Point[] => {
+  const start = portTowards(from, waypoints[0]);
+  const end = portTowards(to, waypoints[waypoints.length - 1]);
+  if (self && start.point.x === end.point.x && start.point.y === end.point.y) {
+    if (start.direction.x) {
+      start.point.y = from.y + from.height / 4;
+      end.point.y = from.y + (from.height * 3) / 4;
+    } else {
+      start.point.x = from.x + from.width / 4;
+      end.point.x = from.x + (from.width * 3) / 4;
+    }
+  }
+  const stub = (port: ReturnType<typeof portTowards>): Point => ({
+    x: port.point.x + port.direction.x * 24,
+    y: port.point.y + port.direction.y * 24
+  });
+  const points = [start.point, stub(start)];
+  let horizontal = start.direction.x !== 0;
+  const connect = (point: Point, horizontalFirst: boolean): void => {
+    const previous = points[points.length - 1];
+    points.push(
+      horizontalFirst ? { x: point.x, y: previous.y } : { x: previous.x, y: point.y },
+      point
+    );
+  };
+  for (const waypoint of waypoints) {
+    const previous = points[points.length - 1];
+    connect(waypoint, horizontal);
+    if (previous.x !== waypoint.x && previous.y !== waypoint.y) horizontal = !horizontal;
+    else if (previous.x !== waypoint.x) horizontal = true;
+    else if (previous.y !== waypoint.y) horizontal = false;
+  }
+  connect(stub(end), end.direction.y !== 0);
+  points.push(end.point);
+  return simplifyRoute(points);
 };
 
 const distance = (a: Point, b: Point): number => Math.hypot(b.x - a.x, b.y - a.y);

@@ -224,14 +224,20 @@
 
   <aside
     class={[
-      'fixed inset-y-0 left-0 z-30 flex w-[19rem] flex-col border-r border-slate-800 bg-slate-950 text-slate-100 transition-[transform,width] md:relative md:translate-x-0',
+      'fixed inset-y-0 left-0 z-30 flex w-[19rem] shrink-0 flex-col overflow-x-hidden border-r border-slate-800 bg-slate-950 text-slate-100 transition-[transform,width] md:relative md:translate-x-0',
       sidebarCollapsed ? 'md:w-16' : 'md:w-[19rem]',
       sidebarOpen ? 'translate-x-0' : '-translate-x-full'
     ]}>
-    <header class="border-b border-white/10 px-4 py-4">
-      <div class="flex items-center justify-between gap-2">
-        <a class="truncate font-semibold tracking-tight" href={`${base}/edit`}
-          >{sidebarCollapsed ? 'M' : 'Mermaid'}</a>
+    <header class={['border-b border-white/10 py-4', sidebarCollapsed ? 'px-3' : 'px-4']}>
+      <div
+        class={[
+          'flex items-center gap-2',
+          sidebarCollapsed ? 'justify-center' : 'justify-between'
+        ]}>
+        {#if !sidebarCollapsed}<a
+            class="truncate font-semibold tracking-tight"
+            href={`${base}/edit`}>Mermaid</a
+          >{/if}
         <Button
           class={[
             'hidden text-slate-400 hover:bg-white/10 hover:text-white md:inline-flex',
@@ -254,7 +260,9 @@
       {/if}
     </header>
 
-    <div class="px-3 py-2"><AppearanceToggle compact={sidebarCollapsed} /></div>
+    <div class={['px-3 py-2', sidebarCollapsed && 'flex justify-center']}>
+      <AppearanceToggle iconOnly={sidebarCollapsed} />
+    </div>
 
     <div class={['grid gap-2 px-3 py-4', sidebarCollapsed ? 'grid-cols-1' : 'grid-cols-2']}>
       <Button
@@ -367,7 +375,9 @@
       </form>
     {/if}
 
-    <nav class="min-h-0 flex-1 overflow-y-auto px-3 pb-4" aria-label="Workspace diagrams">
+    <nav
+      class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-4"
+      aria-label="Workspace diagrams">
       {#if !tree && !error}
         <p class="px-2 py-4 text-sm text-slate-500" role="status">Loading documents…</p>
       {:else if rows.length === 0}
@@ -378,8 +388,12 @@
         {#each rows as row (row.folder?.id ?? row.diagram?.id)}
           {#if row.folder}
             <div
-              class="flex h-9 items-center gap-2 rounded-md pr-1 text-sm text-slate-400 hover:bg-white/5"
-              style={`padding-left: ${0.5 + row.depth * 0.8}rem`}>
+              class={[
+                'flex h-9 items-center rounded-md text-sm text-slate-400 hover:bg-white/5',
+                sidebarCollapsed ? 'justify-center' : 'gap-2 pr-1'
+              ]}
+              title={row.folder.name}
+              style:padding-left={sidebarCollapsed ? undefined : `${0.5 + row.depth * 0.8}rem`}>
               {#if !sidebarCollapsed}<ChevronRight class="size-4" />{/if}
               <FolderIcon class="size-4" />
               {#if !sidebarCollapsed}
@@ -394,12 +408,16 @@
           {:else if row.diagram}
             <div
               class={[
-                'flex h-9 items-center rounded-md pr-1 hover:bg-white/10',
+                'flex h-9 items-center rounded-md hover:bg-white/10',
+                !sidebarCollapsed && 'pr-1',
                 page.url.pathname.endsWith(`/diagram/${row.diagram.id}`) && 'bg-white/10'
               ]}
-              style={`padding-left: ${0.5 + row.depth * 0.8}rem`}>
+              style:padding-left={sidebarCollapsed ? undefined : `${0.5 + row.depth * 0.8}rem`}>
               <a
-                class="flex min-w-0 flex-1 items-center gap-2 text-sm text-slate-200"
+                class={[
+                  'flex h-full min-w-0 flex-1 items-center text-sm text-slate-200',
+                  sidebarCollapsed ? 'justify-center' : 'gap-2'
+                ]}
                 aria-label={row.diagram.title}
                 title={row.diagram.title}
                 href={`${base}/workspace/${params.workspaceId}/diagram/${row.diagram.id}`}
@@ -420,7 +438,11 @@
       {/if}
     </nav>
 
-    <footer class="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-4">
+    <footer
+      class={[
+        'flex items-center border-t border-white/10 py-4',
+        sidebarCollapsed ? 'justify-center px-3' : 'justify-between gap-3 px-4'
+      ]}>
       {#if !sidebarCollapsed}
         <div class="min-w-0">
           <p class="truncate text-sm">{auth.current.user?.displayName ?? ''}</p>
@@ -438,7 +460,7 @@
 
   <main class="flex min-w-0 flex-1 flex-col">
     <div
-      class="flex h-14 shrink-0 items-center border-b border-slate-200 bg-white/75 px-3 backdrop-blur md:hidden">
+      class="flex h-14 shrink-0 items-center border-b bg-background/95 px-3 backdrop-blur md:hidden">
       <Button
         variant="ghost"
         size="icon"
