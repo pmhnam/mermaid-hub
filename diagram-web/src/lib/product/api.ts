@@ -5,6 +5,7 @@ import type {
   CreateDiagramInput,
   CreateFolderInput,
   Diagram,
+  DiagramComment,
   DiagramVersion,
   Folder,
   LoginInput,
@@ -136,6 +137,24 @@ export class ApiClient {
 
   getDiagram(diagramId: string): Promise<Diagram> {
     return this.request(`/api/diagrams/${diagramId}`);
+  }
+  getComments(diagramId: string): Promise<DiagramComment[]> {
+    return this.request(`/api/diagrams/${diagramId}/comments`);
+  }
+  addComment(diagramId: string, body: string, target?: string): Promise<{ id: string }> {
+    return this.request(`/api/diagrams/${diagramId}/comments`, {
+      body: JSON.stringify({ body, target }),
+      method: 'POST'
+    });
+  }
+  resolveComment(diagramId: string, id: string, resolved: boolean): Promise<void> {
+    return this.request(`/api/diagrams/${diagramId}/comments/${id}`, {
+      body: JSON.stringify({ resolved }),
+      method: 'PATCH'
+    });
+  }
+  deleteComment(diagramId: string, id: string): Promise<void> {
+    return this.request(`/api/diagrams/${diagramId}/comments/${id}`, { method: 'DELETE' });
   }
 
   updateDiagram(diagramId: string, input: UpdateDiagramInput): Promise<Diagram> {

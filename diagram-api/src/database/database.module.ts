@@ -5,6 +5,7 @@ import { InitialSchema1757318400000 } from './migrations/1757318400000-InitialSc
 import { PublicDiagramLinks1788940800000 } from './migrations/1788940800000-PublicDiagramLinks.js';
 import { VisualLayout1790035200000 } from './migrations/1790035200000-VisualLayout.js';
 import { GoogleSignIn1790121600000 } from './migrations/1790121600000-GoogleSignIn.js';
+import { DiagramComments1790208000000 } from './migrations/1790208000000-DiagramComments.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { GoogleSignIn1790121600000 } from './migrations/1790121600000-GoogleSign
           PublicDiagramLinks1788940800000,
           VisualLayout1790035200000,
           GoogleSignIn1790121600000,
+          DiagramComments1790208000000,
         ],
         migrationsRun: config.get('DB_MIGRATIONS_RUN', 'false') === 'true',
         ssl:

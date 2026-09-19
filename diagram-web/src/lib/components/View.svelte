@@ -15,6 +15,8 @@
   import { onMount } from 'svelte';
   import { setupVisualDragging } from '$/visual/drag';
   import { layoutEngineFromDocument, type VisualLayout } from '$/visual/layout';
+  import CanvasTools from './CanvasTools.svelte';
+  import { CanvasModel, type CanvasDocument } from '$/visual/canvasModel.svelte';
 
   let {
     onSourceSelect,
@@ -22,11 +24,15 @@
     shouldShowGrid = true,
     editable = false,
     visualLayout,
-    onVisualLayoutChange
+    onVisualLayoutChange,
+    onDocumentChange,
+    onComment
   }: {
     editable?: boolean;
     onSourceSelect?: (range: SourceRange) => void;
     onVisualLayoutChange?: (layout: VisualLayout) => void;
+    onDocumentChange?: (before: CanvasDocument, after: CanvasDocument) => boolean;
+    onComment?: (target?: string) => void;
     panZoomState?: PanZoomState;
     shouldShowGrid?: boolean;
     visualLayout?: VisualLayout;
@@ -47,6 +53,26 @@
   let visualLayoutKey = '';
   let removeVisualDragging: (() => void) | undefined;
   let waitForFontAwesomeToLoad: FontAwesome['waitForFontAwesomeToLoad'] | undefined = $state();
+  const canvas = new CanvasModel(() => panZoomState, {
+    document: (before, after) => {
+      if (onDocumentChange) return onDocumentChange(before, after);
+      if (
+        validatedState.current.code !== before.code ||
+        validatedState.current.mermaid !== before.config
+      )
+        return false;
+      updateCodeStore({
+        code: after.code,
+        mermaid: after.config,
+        ...(after.resetView ? { pan: undefined, zoom: undefined } : {}),
+        ...(after.visualLayout ? { visualLayout: after.visualLayout } : {})
+      });
+      return true;
+    },
+    editable: () => editable,
+    layout: (layout) => onVisualLayoutChange?.(layout),
+    source: (range) => onSourceSelect?.(range)
+  });
 
   // Set up panZoom state observer to update the store when pan/zoom changes
   const setupPanZoomObserver = () => {
@@ -124,14 +150,22 @@
           annotateSvgSourceNavigation(code, detectedDiagramType, graphDiv);
         }
         removeVisualDragging?.();
+        if (graphDiv && !rough)
+          canvas.attach(graphDiv, code, config, renderedDiagramType, currentVisualLayout);
+        else canvas.destroy();
         removeVisualDragging = setupVisualDragging({
           diagramType: detectedDiagramType,
           editable,
           engine: layoutEngineFromDocument(nextCode, nextConfig),
           layout: currentVisualLayout,
-          onChange: onVisualLayoutChange,
+          onChange: (layout) => canvas.commitLayout(layout),
+          onGuides: (guides) => {
+            canvas.guides = guides;
+          },
           panZoomState,
           rough: state.rough,
+          selection: (key) => canvas.dragKeys(key),
+          snap: () => canvas.snap,
           svg: graphDiv
         });
         if (graphDiv && state.panZoom) {
@@ -139,6 +173,7 @@
         } else {
           panZoomState.destroy();
         }
+        canvas.syncSelection();
         if (view?.parentElement && scroll) {
           view.parentElement.scrollTop = scroll;
         }
@@ -164,6 +199,7 @@
       disposed = true;
       if (errorTimer) clearTimeout(errorTimer);
       removeVisualDragging?.();
+      canvas.destroy();
       panZoomState.destroy();
       panZoomState.onPanZoomChange = undefined;
     };
@@ -202,10 +238,22 @@
   role="application"
   aria-label="Interactive diagram preview"
   class:source-navigation={Boolean(onSourceSelect) && !rough}
+  class:canvas-presenting={canvas.presenting}
   ondblclick={handleDoubleClick}
   class={['relative h-full w-full', shouldShowGrid && `grid-bg-${mode.current}`]}>
-  <div id="container" bind:this={container} class="h-full overflow-auto"></div>
-  {#if onSourceSelect && !rough && hasRenderedDiagram}
+  <div
+    id="container"
+    bind:this={container}
+    class={[
+      'absolute inset-x-0 bottom-14 overflow-hidden',
+      canvas.presenting ? 'top-24' : 'top-44'
+    ]}>
+  </div>
+  {#if !rough && hasRenderedDiagram && canvas.graph.nodes.length}<CanvasTools
+      model={canvas}
+      {editable}
+      {onComment} />{/if}
+  {#if onSourceSelect && !rough && hasRenderedDiagram && !canvas.selected.length && !canvas.presenting}
     <div
       class="pointer-events-none absolute bottom-14 left-1/2 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-md border bg-background/90 px-2 py-1 text-center text-xs text-muted-foreground shadow-sm">
       {editable ? 'Drag entities to move · ' : ''}Scroll to zoom · Hold Space + drag to pan ·
@@ -225,6 +273,34 @@
 </div>
 
 <style>
+  .canvas-presenting {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background-color: var(--background);
+  }
+  #view:fullscreen {
+    background-color: var(--background);
+  }
+  #view :global(.canvas-selected > rect),
+  #view :global(.canvas-selected > polygon),
+  #view :global(.canvas-selected .basic.label-container) {
+    stroke: #0284c7 !important;
+    stroke-width: 3px !important;
+  }
+  #view :global(.canvas-selected.attribute-name),
+  #view :global(.canvas-selected.attribute-type) {
+    text-decoration: underline;
+    filter: drop-shadow(0 0 2px #38bdf8);
+  }
+  #view :global(path.canvas-selected),
+  #view :global(path.canvas-related) {
+    stroke: #0284c7 !important;
+    stroke-width: 3px !important;
+  }
+  #view :global(.canvas-dimmed) {
+    opacity: 0.16;
+  }
   #view :global(svg.space-pan),
   #view :global(svg.space-pan *) {
     cursor: grab !important;

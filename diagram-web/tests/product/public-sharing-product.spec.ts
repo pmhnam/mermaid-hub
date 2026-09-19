@@ -99,7 +99,7 @@ test('public links support view, edit, export, and immediate revocation', async 
       'aria-pressed',
       'true'
     );
-    await guestPage.getByRole('button', { name: 'Code' }).click();
+    await guestPage.getByRole('button', { name: 'Code', exact: true }).click();
     const marker = `Guest${unique.replaceAll(/\W/g, '')}`;
     await replaceEditorText(guestPage, `flowchart LR\n  ${marker} --> Saved`);
     await ownerPage.getByRole('button', { name: 'Close' }).click();

@@ -32,7 +32,7 @@ export default defineConfig({
       url: 'http://127.0.0.1:3001/api/health'
     },
     {
-      command: 'corepack pnpm exec vite dev --host 127.0.0.1',
+      command: `corepack pnpm exec vite ${process.env.CI ? 'preview' : 'dev'} --host 127.0.0.1`,
       env: { MERMAID_API_PROXY_URL: 'http://127.0.0.1:3001' },
       reuseExistingServer: false,
       timeout: 120_000,

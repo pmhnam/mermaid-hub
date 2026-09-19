@@ -9,15 +9,24 @@ import { Diagram } from './entities/diagram.entity.js';
 import { DiagramsService } from './diagrams.service.js';
 import { DiagramsController } from './diagrams.controller.js';
 import { CollaborationModule } from '../collaboration/collaboration.module.js';
+import { DiagramComment } from './entities/diagram-comment.entity.js';
+import { CommentsController } from './comments.controller.js';
+import { CommentsService } from './comments.service.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Diagram, Folder, DiagramMember, User]),
+    TypeOrmModule.forFeature([
+      Diagram,
+      Folder,
+      DiagramMember,
+      User,
+      DiagramComment,
+    ]),
     AuthModule,
     PermissionsModule,
     CollaborationModule,
   ],
-  controllers: [DiagramsController],
-  providers: [DiagramsService],
+  controllers: [DiagramsController, CommentsController],
+  providers: [DiagramsService, CommentsService],
 })
 export class DiagramsModule {}

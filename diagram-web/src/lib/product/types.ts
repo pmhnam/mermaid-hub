@@ -146,3 +146,12 @@ export interface ResourceMember {
 export interface UpdateMemberInput {
   role: Exclude<ResourceRole, 'owner'>;
 }
+export interface DiagramComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  target: string | null;
+  resolved: boolean;
+  createdAt: string;
+}

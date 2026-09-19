@@ -8,7 +8,7 @@
     <h1 class="mt-3 text-3xl font-semibold tracking-tight">
       Choose a diagram or create a new one.
     </h1>
-    <p class="mt-4 leading-7 text-slate-600">
+    <p class="mt-4 leading-7 text-muted-foreground">
       Documents in this workspace are saved to your account instead of encoded into a sharing URL.
     </p>
     <a

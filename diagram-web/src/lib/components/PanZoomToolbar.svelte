@@ -3,6 +3,7 @@
   import { Button } from '$/components/ui/button';
   import { Separator } from '$/components/ui/separator';
   import type { PanZoomState } from '$/util/panZoom';
+  import * as Popover from '$/components/ui/popover';
   import ExpandIcon from '~icons/material-symbols/open-in-full-rounded';
   import ArrowsToCircleIcon from '~icons/material-symbols/screenshot-frame-2';
   import MagnifyingGlassPlusIcon from '~icons/material-symbols/zoom-in';
@@ -21,12 +22,52 @@
   } = $props();
 
   const zoomClass = $derived(compact ? undefined : 'hidden sm:block');
+  let percent = $state(100);
+  let enabled = $state(false);
+  let hasSelection = $state(false);
+  $effect(() =>
+    panZoomState.subscribe(() => {
+      const value = panZoomState.snapshot();
+      enabled = Boolean(value);
+      percent = Math.round(value?.percent ?? 100);
+      hasSelection = panZoomState.hasSelection;
+    })
+  );
 </script>
 
 <FloatingToolbar>
   <Button variant="ghost" size="icon" title="Reset view" onclick={() => panZoomState.reset()}>
     <ArrowsToCircleIcon />
   </Button>
+  <Popover.Root>
+    <Popover.Trigger
+      class="rounded px-1 text-xs tabular-nums hover:bg-accent"
+      disabled={!enabled}
+      aria-label="Zoom options">{percent}%</Popover.Trigger>
+    <Popover.Content class="w-44 space-y-2 p-2">
+      <label class="flex items-center gap-2 text-xs"
+        >Zoom %<input
+          class="w-20 rounded border p-1"
+          aria-label="Zoom percentage"
+          type="number"
+          min="5"
+          max="400"
+          value={percent}
+          onchange={(event) =>
+            panZoomState.setPercent(Number(event.currentTarget.value))} /></label>
+      {#each [25, 50, 100, 200] as value (value)}<button
+          class="block w-full rounded p-1 text-left text-sm hover:bg-accent"
+          onclick={() => panZoomState.setPercent(value)}>{value}%</button
+        >{/each}
+      <button
+        class="block w-full rounded p-1 text-left text-sm hover:bg-accent"
+        onclick={() => panZoomState.reset()}>Fit all</button>
+      <button
+        class="block w-full rounded p-1 text-left text-sm hover:bg-accent disabled:opacity-40"
+        disabled={!hasSelection}
+        onclick={() => panZoomState.fitSelection()}>Fit selection</button>
+    </Popover.Content>
+  </Popover.Root>
   <Separator orientation="vertical" />
   <Button
     variant="ghost"

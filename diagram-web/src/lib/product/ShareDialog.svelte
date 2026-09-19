@@ -208,13 +208,11 @@
       <Dialog.Description>Invite workspace members or publish a revocable link.</Dialog.Description>
     </Dialog.Header>
 
-    <section
-      class="rounded-xl border border-slate-200 bg-slate-50 p-4"
-      aria-labelledby="public-link-heading">
+    <section class="rounded-xl border bg-muted/40 p-4" aria-labelledby="public-link-heading">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="public-link-heading" class="font-semibold">Public link</h2>
-          <p class="mt-1 text-sm text-slate-500">
+          <p class="mt-1 text-sm text-muted-foreground">
             Anyone with the link can access this diagram without signing in.
           </p>
         </div>
@@ -234,7 +232,7 @@
         <legend class="sr-only">Public link permission</legend>
         {#each [{ description: 'View live updates and export files.', label: 'Can view', value: 'public_read' }, { description: 'Edit code and config in real time.', label: 'Can edit', value: 'public_edit' }] as option (option.value)}
           <label
-            class="flex cursor-pointer gap-3 rounded-lg border border-slate-200 bg-white p-3 has-checked:border-rose-500 has-checked:ring-1 has-checked:ring-rose-500">
+            class="flex cursor-pointer gap-3 rounded-lg border bg-background p-3 has-checked:border-rose-500 has-checked:ring-1 has-checked:ring-rose-500">
             <input
               class="mt-1"
               type="radio"
@@ -247,7 +245,7 @@
               }} />
             <span
               ><span class="block text-sm font-semibold">{option.label}</span><span
-                class="block text-xs text-slate-500">{option.description}</span
+                class="block text-xs text-muted-foreground">{option.description}</span
               ></span>
           </label>
         {/each}
@@ -273,13 +271,13 @@
             disabled={publicLoading}
             onclick={rotatePublicLink}><RefreshIcon /></Button>
         </div>
-        <p class="mt-2 text-xs text-slate-500">
+        <p class="mt-2 text-xs text-muted-foreground">
           The access token stays in the URL fragment and is not sent in page requests.
         </p>
       {/if}
     </section>
 
-    <section class="border-t border-slate-200 pt-4" aria-labelledby="member-access-heading">
+    <section class="border-t pt-4" aria-labelledby="member-access-heading">
       <h2 id="member-access-heading" class="font-semibold">Workspace access</h2>
       <form class="mt-3 flex flex-wrap items-end gap-3" onsubmit={addMember}>
         <label class="min-w-56 flex-1 text-sm font-medium"
@@ -290,37 +288,37 @@
             bind:value={memberEmail} /></label>
         <label class="text-sm font-medium"
           >Role<select
-            class="mt-1 block h-9 rounded-md border border-slate-300 bg-white px-3"
+            class="mt-1 block h-9 rounded-md border border-input bg-background px-3 text-foreground"
             bind:value={memberRole}
             ><option value="viewer">Viewer</option><option value="editor">Editor</option></select
           ></label>
         <Button type="submit">Add access</Button>
       </form>
-      <p class="mt-2 text-xs text-slate-500">
+      <p class="mt-2 text-xs text-muted-foreground">
         {diagram.folderId
           ? 'Access applies to this folder and its diagrams.'
           : 'Access applies to this root diagram.'}
       </p>
 
-      <div class="mt-4 border-t border-slate-200 pt-3">
+      <div class="mt-4 border-t pt-3">
         <h3 class="text-sm font-semibold">People with direct access</h3>
         {#if membersLoading && members.length === 0}
-          <p class="mt-2 text-sm text-slate-500" role="status">Loading access...</p>
+          <p class="mt-2 text-sm text-muted-foreground" role="status">Loading access...</p>
         {:else if members.length === 0}
-          <p class="mt-2 text-sm text-slate-500">No direct members yet.</p>
+          <p class="mt-2 text-sm text-muted-foreground">No direct members yet.</p>
         {:else}
-          <ul class="mt-2 divide-y divide-slate-200">
+          <ul class="mt-2 divide-y divide-border">
             {#each members as member (member.userId)}
               <li class="flex flex-wrap items-center gap-3 py-3">
                 <div class="min-w-48 flex-1">
                   <p class="text-sm font-medium">{member.displayName}</p>
-                  <p class="text-xs text-slate-500">{member.email}</p>
+                  <p class="text-xs text-muted-foreground">{member.email}</p>
                 </div>
                 <label class="text-xs font-medium" for={`member-role-${member.userId}`}>Role</label>
                 <select
                   id={`member-role-${member.userId}`}
                   aria-label={`Role for ${member.displayName}`}
-                  class="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+                  class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
                   value={member.role}
                   disabled={pendingMemberId === member.userId}
                   onchange={(event) =>
@@ -340,7 +338,10 @@
     </section>
 
     {#if message}<p
-        class={['text-sm', messageIsError ? 'text-red-700' : 'text-slate-600']}
+        class={[
+          'text-sm',
+          messageIsError ? 'text-red-700 dark:text-red-300' : 'text-muted-foreground'
+        ]}
         role={messageIsError ? 'alert' : 'status'}
         aria-live="polite">
         {message}

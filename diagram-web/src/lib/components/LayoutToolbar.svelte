@@ -41,7 +41,11 @@
   const unsupported = $derived(diagramType !== undefined && !isVisualLayoutSupported(diagramType));
 
   const choose = (engine: LayoutEngine): void => {
-    if (!disabled && !unsupported && engine !== selected) onChange(engine);
+    if (disabled || unsupported || engine === selected) return;
+    const unhandled = window.dispatchEvent(
+      new CustomEvent('mermaid-change-layout', { cancelable: true, detail: engine })
+    );
+    if (unhandled) onChange(engine);
   };
 </script>
 

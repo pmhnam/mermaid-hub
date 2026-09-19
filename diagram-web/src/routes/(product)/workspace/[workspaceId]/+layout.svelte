@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
+  import AppearanceToggle from '$lib/components/AppearanceToggle.svelte';
   import { Input } from '$lib/components/ui/input';
   import { auth } from '$lib/product/auth.svelte';
   import { ApiError } from '$lib/product/api';
@@ -213,7 +214,7 @@
   <meta name="robots" content="noindex" />
 </svelte:head>
 
-<div class="flex h-dvh overflow-hidden bg-[#f4f3ef] text-slate-950">
+<div class="flex h-dvh overflow-hidden bg-background text-foreground">
   {#if sidebarOpen}
     <button
       class="fixed inset-0 z-20 bg-slate-950/40 md:hidden"
@@ -252,6 +253,8 @@
         </p>
       {/if}
     </header>
+
+    <div class="px-3 py-2"><AppearanceToggle compact={sidebarCollapsed} /></div>
 
     <div class={['grid gap-2 px-3 py-4', sidebarCollapsed ? 'grid-cols-1' : 'grid-cols-2']}>
       <Button

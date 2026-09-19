@@ -1,5 +1,6 @@
 import type { PanZoomState } from '$/util/panZoom';
 import { erEdgeUpdater } from './erEdges';
+import { elementBounds } from './canvasGraph';
 import {
   emptyVisualLayout,
   isVisualLayoutSupported,
@@ -11,6 +12,9 @@ import {
 } from './layout';
 
 interface DragOptions {
+  selection?: (key: string) => string[];
+  snap?: () => boolean;
+  onGuides?: (guides: { x?: number; y?: number }) => void;
   diagramType?: string;
   editable: boolean;
   engine: LayoutEngine;
@@ -22,6 +26,14 @@ interface DragOptions {
 }
 
 interface ActiveDrag {
+  center: { x: number; y: number };
+  group: {
+    key: string;
+    element: SVGGElement;
+    baseTransform: string;
+    offset: { x: number; y: number };
+  }[];
+  delta: { x: number; y: number };
   baseTransform: string;
   element: SVGGElement;
   key: string;
@@ -56,7 +68,10 @@ export const setupVisualDragging = ({
   onChange,
   panZoomState,
   rough,
-  svg
+  svg,
+  selection,
+  snap,
+  onGuides
 }: DragOptions): (() => void) => {
   if (!svg || rough || !isVisualLayoutSupported(diagramType)) {
     return () => undefined;
@@ -87,15 +102,39 @@ export const setupVisualDragging = ({
       finish(undefined, false);
       return;
     }
-    if (event.button !== 0 || !event.isPrimary || active || panZoomState.isSpacePanning) return;
+    if (
+      event.button !== 0 ||
+      !event.isPrimary ||
+      event.shiftKey ||
+      active ||
+      panZoomState.isSpacePanning
+    )
+      return;
     const element = (event.target as Element | null)?.closest<SVGGElement>('[data-visual-node]');
     const key = element?.getAttribute('data-visual-node');
     const start = pointFromEvent(svg, event);
     if (!element || !key || !start) return;
     event.stopPropagation();
+    const keys = selection?.(key) ?? [key];
+    const bounds = elementBounds(element, panZoomState.viewport() ?? svg);
     active = {
       baseTransform: element.getAttribute('data-visual-base-transform') ?? '',
+      center: { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 },
+      delta: { x: 0, y: 0 },
       element,
+      group: visualNodeElements(svg).flatMap((node) => {
+        const id = visualNodeKey(node);
+        return id && keys.includes(id)
+          ? [
+              {
+                baseTransform: node.getAttribute('data-visual-base-transform') ?? '',
+                element: node,
+                key: id,
+                offset: layout.offsets[id] ?? { x: 0, y: 0 }
+              }
+            ]
+          : [];
+      }),
       key,
       moved: false,
       pointerId: event.pointerId,
@@ -120,25 +159,29 @@ export const setupVisualDragging = ({
     event.preventDefault();
     const point = pointFromEvent(svg, event);
     if (!point) return;
-    active.element.setAttribute(
-      'transform',
-      visualTransform(active.baseTransform, {
-        x: active.startOffset.x + point.x - active.start.x,
-        y: active.startOffset.y + point.y - active.start.y
-      })
-    );
-    updateEdges?.({
-      ...layout.offsets,
-      [active.key]: {
-        x: active.startOffset.x + point.x - active.start.x,
-        y: active.startOffset.y + point.y - active.start.y
-      }
-    });
+    let x = point.x - active.start.x,
+      y = point.y - active.start.y;
+    if (snap?.()) {
+      x = Math.round((active.center.x + x) / 20) * 20 - active.center.x;
+      y = Math.round((active.center.y + y) / 20) * 20 - active.center.y;
+      onGuides?.({ x: active.center.x + x, y: active.center.y + y });
+    }
+    active.delta = { x, y };
+    const offsets = { ...layout.offsets };
+    for (const node of active.group) {
+      offsets[node.key] = { x: node.offset.x + x, y: node.offset.y + y };
+      node.element.setAttribute(
+        'transform',
+        visualTransform(node.baseTransform, offsets[node.key])
+      );
+    }
+    updateEdges?.(offsets);
   };
   const finish = (event: PointerEvent | undefined, commit: boolean): void => {
     if (!active || (event && active.pointerId !== event.pointerId)) return;
     const drag = active;
     active = undefined;
+    onGuides?.({});
     if (drag.element.hasPointerCapture(drag.pointerId))
       drag.element.releasePointerCapture(drag.pointerId);
     drag.element.style.cursor = 'grab';
@@ -146,7 +189,8 @@ export const setupVisualDragging = ({
     if (!drag.moved) return;
     const point = event ? pointFromEvent(svg, event) : undefined;
     if (!commit || !point) {
-      drag.element.setAttribute('transform', visualTransform(drag.baseTransform, drag.startOffset));
+      for (const node of drag.group)
+        node.element.setAttribute('transform', visualTransform(node.baseTransform, node.offset));
       updateEdges?.(layout.offsets);
       return;
     }
@@ -155,10 +199,12 @@ export const setupVisualDragging = ({
       mode: 'manual',
       offsets: {
         ...layout.offsets,
-        [drag.key]: {
-          x: drag.startOffset.x + point.x - drag.start.x,
-          y: drag.startOffset.y + point.y - drag.start.y
-        }
+        ...Object.fromEntries(
+          drag.group.map((node) => [
+            node.key,
+            { x: node.offset.x + drag.delta.x, y: node.offset.y + drag.delta.y }
+          ])
+        )
       }
     };
     onChange(layout);
@@ -173,10 +219,8 @@ export const setupVisualDragging = ({
   window.addEventListener('blur', handleBlur);
   return () => {
     if (active) {
-      active.element.setAttribute(
-        'transform',
-        visualTransform(active.baseTransform, active.startOffset)
-      );
+      for (const node of active.group)
+        node.element.setAttribute('transform', visualTransform(node.baseTransform, node.offset));
       panZoomState.setPanEnabled(active.wasPanEnabled);
     }
     svg.removeEventListener('pointerdown', handleDown, true);

@@ -5,6 +5,7 @@
   import PanZoomToolbar from '$lib/components/PanZoomToolbar.svelte';
   import View from '$lib/components/View.svelte';
   import { Button } from '$lib/components/ui/button';
+  import AppearanceToggle from '$lib/components/AppearanceToggle.svelte';
   import { defaultState } from '$lib/constants';
   import { ApiClient, ApiError } from '$lib/product/api';
   import { CollaborativeDocumentController } from '$lib/product/collaboration/CollaborativeDocumentController';
@@ -54,6 +55,7 @@
   let previewCursors = $state<RemotePreviewCursor[]>([]);
   let collaborationRole = $state<'editor' | 'owner' | 'viewer'>('viewer');
   let mobilePanel = $state<'editor' | 'preview'>('editor');
+  let editorOpen = $state(true);
   let width = $state(0);
   let exportOpen = $state(false);
   let exportSvgElement = $state<SVGSVGElement | null>(null);
@@ -84,6 +86,7 @@
 
   const selectSource = (range: SourceRange): void => {
     if (!editable) return;
+    editorOpen = true;
     mobilePanel = 'editor';
     updateCodeStore({ editorMode: 'code' });
     selectionRequest = { ...range, id: ++selectionId };
@@ -213,9 +216,9 @@
   <meta name="referrer" content="no-referrer" />
 </svelte:head>
 
-<div class="flex h-dvh min-h-0 flex-col bg-[#f8f7f4] text-slate-950" bind:clientWidth={width}>
+<div class="flex h-dvh min-h-0 flex-col bg-background text-foreground" bind:clientWidth={width}>
   <header
-    class="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2 md:px-5">
+    class="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b bg-background px-4 py-2 md:px-5">
     <div class="min-w-0">
       <h1 class="truncate text-sm font-semibold md:text-base">
         {diagram?.title ?? 'Shared diagram'}
@@ -233,6 +236,7 @@
       {/if}
     </div>
     <div class="flex items-center gap-2">
+      <AppearanceToggle compact />
       <div class="hidden -space-x-2 sm:flex" aria-label="People viewing this diagram">
         {#each presence.slice(0, 5) as user (user.userId)}
           <span
@@ -298,17 +302,19 @@
       </div>
     </main>
   {:else if editable}
-    <main class="grid min-h-0 flex-1 md:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.2fr)]">
+    <main
+      class="grid min-h-0 flex-1"
+      style:grid-template-columns={!isMobile && editorOpen
+        ? 'minmax(20rem,0.8fr) minmax(0,1.2fr)'
+        : 'minmax(0,1fr)'}>
       <section
         data-testid="product-editor"
         class={[
-          'min-h-0 flex-col border-r border-slate-200 bg-white',
-          mobilePanel === 'editor' ? 'flex' : 'hidden',
-          'md:flex'
+          'min-h-0 flex-col border-r bg-background',
+          (isMobile ? mobilePanel === 'editor' : editorOpen) ? 'flex' : 'hidden'
         ]}
         aria-label="Diagram editor">
-        <div
-          class="flex h-11 shrink-0 items-center gap-1 border-b border-slate-200 bg-slate-50 px-3">
+        <div class="flex h-11 shrink-0 items-center gap-1 border-b bg-muted px-3">
           <Button
             size="sm"
             variant={validatedState.current.editorMode === 'code' ? 'secondary' : 'ghost'}
@@ -342,12 +348,28 @@
       <section
         bind:this={previewElement}
         class={[
-          'relative min-h-0 bg-[#f8f7f4]',
+          'relative min-h-0 bg-background',
           mobilePanel === 'preview' ? 'block' : 'hidden',
           'md:block'
         ]}
         aria-label="Diagram preview">
         <View
+          onDocumentChange={(before, after) => {
+            if (
+              !controller ||
+              !editable ||
+              controller.code.toString() !== before.code ||
+              validatedState.current.mermaid !== before.config
+            )
+              return false;
+            if (after.resetView) updateCodeStore({ pan: undefined, zoom: undefined });
+            controller.setDocumentAndVisualLayout(
+              after.code,
+              after.config,
+              after.visualLayout ?? controller.getVisualLayout()
+            );
+            return true;
+          }}
           onSourceSelect={selectSource}
           {panZoomState}
           shouldShowGrid={validatedState.current.grid}
@@ -377,6 +399,14 @@
             aria-label="Full screen"
             onclick={enterFullscreen}><FullscreenIcon /></Button>
         </div>
+        {#if !isMobile}<Button
+            class="absolute top-3 left-3 border bg-background"
+            variant="ghost"
+            size="sm"
+            aria-expanded={editorOpen}
+            onclick={() => (editorOpen = !editorOpen)}
+            ><CodeIcon />{editorOpen ? 'Hide code' : 'Edit code'}</Button
+          >{/if}
       </section>
     </main>
   {:else}

@@ -6,7 +6,6 @@
   import PanZoomToolbar from '$lib/components/PanZoomToolbar.svelte';
   import View from '$lib/components/View.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { Input } from '$lib/components/ui/input';
   import * as Resizable from '$lib/components/ui/resizable';
   import { defaultState } from '$lib/constants';
   import { ApiError } from '$lib/product/api';
@@ -20,6 +19,9 @@
   } from '$lib/product/collaboration/presence';
   import ExportDialog from '$lib/product/ExportDialog.svelte';
   import ShareDialog from '$lib/product/ShareDialog.svelte';
+  import AppearanceToggle from '$lib/components/AppearanceToggle.svelte';
+  import VersionPanel from '$lib/product/VersionPanel.svelte';
+  import CommentsPanel from '$lib/product/CommentsPanel.svelte';
   import type { Diagram, DiagramVersion, ResourceRole } from '$lib/product/types';
   import type { SourceRange, SourceSelectionRequest } from '$lib/types';
   import { createVersionDiff } from '$lib/product/version-diff';
@@ -43,6 +45,7 @@
   import PreviewIcon from '~icons/material-symbols/visibility-outline-rounded';
   import SettingsIcon from '~icons/material-symbols/settings-outline-rounded';
   import ShareIcon from '~icons/material-symbols/share';
+  import CommentIcon from '~icons/material-symbols/chat-bubble-outline-rounded';
 
   const { diagramId, workspaceId }: { diagramId: string; workspaceId: string } = $props();
   const panZoomState = new PanZoomState();
@@ -61,8 +64,20 @@
   let isMobile = $derived(viewportWidth < 768);
   let historyOpen = $state(false);
   let shareOpen = $state(false);
+  let commentsOpen = $state(false);
+  let commentTarget = $state<string>();
   let exportOpen = $state(false);
   let editorOpen = $state(true);
+  let codePane: Resizable.Pane | undefined = $state();
+  let editorSize = 36;
+  const toggleEditor = () => {
+    if (editorOpen) editorSize = codePane?.getSize() ?? 36;
+    editorOpen = !editorOpen;
+  };
+  $effect(() => {
+    if (!codePane) return;
+    codePane.resize(isMobile ? (mobilePanel === 'editor' ? 100 : 0) : editorOpen ? editorSize : 0);
+  });
   let previewElement = $state<HTMLElement | null>(null);
   let exportSvgElement = $state<SVGSVGElement | null>(null);
   let versions = $state<DiagramVersion[]>([]);
@@ -130,6 +145,7 @@
     actionMessage = '';
     try {
       await auth.api.restoreVersion(diagramId, selectedVersion.id);
+      historyOpen = false;
       actionMessage =
         'Restore requested. The collaborative document will update when synchronized.';
       await loadVersions();
@@ -271,9 +287,9 @@
 
 <svelte:window bind:innerWidth={viewportWidth} />
 
-<div class="flex h-full min-h-0 flex-col bg-[#f7f6f2]">
+<div class="flex h-full min-h-0 flex-col bg-background text-foreground">
   <header
-    class="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-slate-950 px-3 py-2 text-slate-100 md:px-5">
+    class="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-slate-950 px-3 py-2 text-slate-100 md:px-5">
     <div class="min-w-0">
       <h1 class="truncate text-sm font-semibold md:text-base">{title}</h1>
       <p class="text-[11px] text-slate-400" aria-live="polite">
@@ -287,6 +303,16 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
+      <AppearanceToggle compact />
+      <Button
+        size="sm"
+        variant="ghost"
+        aria-label="Comments"
+        class="text-slate-300 hover:bg-white/10 hover:text-white"
+        onclick={() => {
+          commentTarget = undefined;
+          commentsOpen = true;
+        }}><CommentIcon /><span class="hidden sm:inline">Comments</span></Button>
       <div class="hidden -space-x-2 sm:flex" aria-label="People viewing this diagram">
         {#each presence.slice(0, 5) as user (user.userId)}
           <span
@@ -301,6 +327,7 @@
         size="sm"
         variant="ghost"
         aria-pressed={historyOpen}
+        aria-label="Versions"
         onclick={() => (historyOpen = !historyOpen)}>
         <HistoryIcon /> <span class="hidden sm:inline">Versions</span>
       </Button>
@@ -309,6 +336,7 @@
         size="sm"
         variant="ghost"
         onclick={openExport}>
+        <span class="sr-only sm:hidden">Export</span>
         <DownloadIcon /> <span class="hidden sm:inline">Export</span>
       </Button>
       {#if role === 'owner'}
@@ -316,18 +344,10 @@
           class="bg-rose-600 text-white hover:bg-rose-500"
           size="sm"
           onclick={() => (shareOpen = true)}>
+          <span class="sr-only sm:hidden">Share</span>
           <ShareIcon /> <span class="hidden sm:inline">Share</span>
         </Button>
       {/if}
-      <Button
-        class="hidden text-slate-300 hover:bg-white/10 hover:text-white md:inline-flex"
-        size="sm"
-        variant="ghost"
-        aria-pressed={editorOpen}
-        onclick={() => (editorOpen = !editorOpen)}>
-        <CodeIcon />
-        {editorOpen ? 'Hide code' : 'Edit code'}
-      </Button>
       <div class="flex items-center gap-1 rounded-lg bg-slate-100 p-1 md:hidden">
         <Button
           size="sm"
@@ -349,80 +369,26 @@
     </div>
   {/if}
 
-  {#if historyOpen}
-    <section class="max-h-[45vh] shrink-0 overflow-auto border-b border-slate-200 bg-white p-4">
-      <div class="grid gap-4 lg:grid-cols-[18rem_1fr]">
-        <div>
-          {#if role !== 'viewer'}
-            <div class="mb-3 flex gap-2">
-              <Input placeholder="Version note (optional)" bind:value={versionMessage} />
-              <Button onclick={createVersion}>Save</Button>
-            </div>
-          {/if}
-          {#if versionsLoading}
-            <p class="text-sm text-slate-500">Loading versions...</p>
-          {:else if versions.length === 0}
-            <p class="text-sm text-slate-500">No saved versions yet.</p>
-          {:else}
-            <div class="space-y-1">
-              {#each versions as version (version.id)}
-                <button
-                  class="flex w-full justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
-                  class:bg-slate-100={selectedVersion?.id === version.id}
-                  onclick={() => selectVersion(version)}>
-                  <span>v{version.versionNumber} · {version.message || version.type}</span>
-                  <time class="text-xs text-slate-500"
-                    >{new Date(version.createdAt).toLocaleString()}</time>
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </div>
-        {#if selectedVersion && versionDiff}
-          <div class="min-w-0">
-            <div class="mb-2 flex items-center justify-between gap-2">
-              <h2 class="font-semibold">
-                Version {selectedVersion.versionNumber} preview and diff
-              </h2>
-              {#if role === 'owner'}<Button variant="destructive" onclick={restoreVersion}
-                  >Restore</Button
-                >{/if}
-            </div>
-            <div class="grid gap-3 md:grid-cols-2">
-              <div>
-                <h3 class="mb-1 text-xs font-semibold tracking-wide uppercase">Diagram</h3>
-                <pre
-                  class="max-h-52 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-100">{#each versionDiff.content as part, index (`content-${index}`)}<span
-                      class:text-emerald-300={part.added}
-                      class:text-rose-300={part.removed}
-                      >{part.added ? '+ ' : part.removed ? '- ' : '  '}{part.value}</span
-                    >{/each}</pre>
-              </div>
-              <div>
-                <h3 class="mb-1 text-xs font-semibold tracking-wide uppercase">Config</h3>
-                <pre
-                  class="max-h-52 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-100">{#each versionDiff.config as part, index (`config-${index}`)}<span
-                      class:text-emerald-300={part.added}
-                      class:text-rose-300={part.removed}
-                      >{part.added ? '+ ' : part.removed ? '- ' : '  '}{part.value}</span
-                    >{/each}</pre>
-              </div>
-            </div>
-          </div>
-        {/if}
-      </div>
-      {#if actionMessage}<p class="mt-2 text-sm text-slate-600" aria-live="polite">
-          {actionMessage}
-        </p>{/if}
-    </section>
-  {/if}
+  <VersionPanel
+    bind:open={historyOpen}
+    {versions}
+    selected={selectedVersion}
+    loading={versionsLoading}
+    bind:message={versionMessage}
+    feedback={actionMessage}
+    canSave={role !== 'viewer'}
+    canRestore={role === 'owner'}
+    diff={versionDiff}
+    onSelect={selectVersion}
+    onSave={createVersion}
+    onRestore={restoreVersion} />
 
   {#snippet editorPanel()}
     <section
       data-testid="product-editor"
-      class="flex h-full min-h-0 flex-col bg-white"
+      class="flex h-full min-h-0 flex-col bg-background"
       aria-label="Diagram editor">
-      <div class="flex h-11 shrink-0 items-center gap-1 border-b border-slate-200 bg-slate-50 px-3">
+      <div class="flex h-11 shrink-0 items-center gap-1 border-b bg-muted px-3">
         <Button
           size="sm"
           variant={validatedState.current.editorMode === 'code' ? 'secondary' : 'ghost'}
@@ -453,10 +419,30 @@
   {#snippet previewPanel()}
     <section
       bind:this={previewElement}
-      class="relative h-full min-h-0 overflow-hidden bg-[#f8f7f4]"
+      class="relative h-full min-h-0 overflow-hidden bg-background"
       aria-label="Diagram preview">
       <View
+        onComment={(target) => {
+          commentTarget = target;
+          commentsOpen = true;
+        }}
         onSourceSelect={selectSource}
+        onDocumentChange={(before, after) => {
+          if (
+            !controller ||
+            role === 'viewer' ||
+            controller.code.toString() !== before.code ||
+            controller.config.toString() !== before.config
+          )
+            return false;
+          if (after.resetView) updateCodeStore({ pan: undefined, zoom: undefined });
+          controller.setDocumentAndVisualLayout(
+            after.code,
+            after.config,
+            after.visualLayout ?? controller.getVisualLayout()
+          );
+          return true;
+        }}
         {panZoomState}
         shouldShowGrid={validatedState.current.grid}
         editable={role !== 'viewer'}
@@ -485,12 +471,13 @@
           aria-label="Full screen"
           onclick={enterFullscreen}><FullscreenIcon /></Button>
       </div>
-      {#if !editorOpen && !isMobile}
+      {#if !isMobile}
         <Button
-          class="absolute top-3 left-3 border border-slate-200 bg-white shadow-sm hover:bg-slate-100"
+          class="absolute top-3 left-3 border bg-background shadow-sm hover:bg-accent"
           variant="ghost"
           size="sm"
-          onclick={() => (editorOpen = true)}><CodeIcon /> Edit code</Button>
+          aria-expanded={editorOpen}
+          onclick={toggleEditor}><CodeIcon /> {editorOpen ? 'Hide code' : 'Edit code'}</Button>
       {/if}
     </section>
   {/snippet}
@@ -505,33 +492,29 @@
       </div>
     </div>
   {:else if loaded && controller}
-    {#if isMobile}
-      <div class="min-h-0 flex-1">
-        {#if mobilePanel === 'editor'}
-          {@render editorPanel()}
-        {:else}
-          {@render previewPanel()}
-        {/if}
-      </div>
-    {:else}
-      <div class="min-h-0 flex-1">
-        {#if editorOpen}
-          <Resizable.PaneGroup direction="horizontal" autoSaveId="productEditor">
-            <Resizable.Pane defaultSize={36} minSize={22}>{@render editorPanel()}</Resizable.Pane>
-            <Resizable.Handle withHandle />
-            <Resizable.Pane minSize={35}>{@render previewPanel()}</Resizable.Pane>
-          </Resizable.PaneGroup>
-        {:else}
-          {@render previewPanel()}
-        {/if}
-      </div>
-    {/if}
+    <div class="min-h-0 flex-1">
+      <Resizable.PaneGroup direction="horizontal" autoSaveId="productEditor">
+        <Resizable.Pane
+          bind:this={codePane}
+          defaultSize={36}
+          minSize={isMobile ? 0 : 22}
+          collapsible
+          collapsedSize={0}>{@render editorPanel()}</Resizable.Pane>
+        <Resizable.Handle withHandle class={isMobile || !editorOpen ? 'hidden' : ''} />
+        <Resizable.Pane minSize={isMobile ? 0 : 35}>{@render previewPanel()}</Resizable.Pane>
+      </Resizable.PaneGroup>
+    </div>
   {/if}
 </div>
 
 {#if diagram && role === 'owner'}
   <ShareDialog {diagram} bind:open={shareOpen} />
 {/if}
+<CommentsPanel
+  {diagramId}
+  bind:open={commentsOpen}
+  bind:target={commentTarget}
+  owner={role === 'owner'} />
 
 <ExportDialog
   code={currentContent}

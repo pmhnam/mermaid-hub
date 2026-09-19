@@ -1,6 +1,7 @@
 import { roundedRelationshipPath, routeErRelationship, type EntityBounds } from './erRouting';
 import type { VisualLayoutOffset } from './layout';
 import { visualNodeElements, visualNodeKey } from './layout';
+import { elementBounds, relativeMatrix } from './canvasGraph';
 
 // Capture geometry before offsets are applied. All routing is in each edge's
 // parent coordinates, independent of the canvas pan/zoom transform.
@@ -20,17 +21,8 @@ export const erEdgeUpdater = (
         (node) => node.id && id.slice(`id_${from?.id}_`.length).startsWith(`${node.id}_`)
       );
       const parent = path.parentNode as SVGGraphicsElement;
-      const parentMatrix = parent.getCTM();
-      if (!from?.key || !to?.key || !parentMatrix) return [];
-      const bounds = (node: SVGGElement): EntityBounds | undefined => {
-        const box = node.getBBox();
-        const nodeMatrix = node.getCTM();
-        if (!nodeMatrix) return undefined;
-        const matrix = parentMatrix.inverse().multiply(nodeMatrix);
-        const top = new DOMPoint(box.x, box.y).matrixTransform(matrix);
-        const bottom = new DOMPoint(box.x + box.width, box.y + box.height).matrixTransform(matrix);
-        return { height: bottom.y - top.y, width: bottom.x - top.x, x: top.x, y: top.y };
-      };
+      if (!from?.key || !to?.key) return [];
+      const bounds = (node: SVGGElement): EntityBounds => elementBounds(node, parent);
       const fromBounds = bounds(from.element);
       const toBounds = bounds(to.element);
       if (!fromBounds || !toBounds) return [];
@@ -85,10 +77,10 @@ export const erEdgeUpdater = (
       // Place the label on the actual rerouted line, not halfway between offsets.
       const midpoint = edge.path.getPointAtLength(edge.path.getTotalLength() / 2);
       const labelParent = edge.label?.parentNode as SVGGraphicsElement | undefined;
-      const labelMatrix = labelParent?.getCTM();
-      const edgeMatrix = (edge.path.parentNode as SVGGraphicsElement).getCTM();
-      if (labelMatrix && edgeMatrix) {
-        const point = midpoint.matrixTransform(labelMatrix.inverse().multiply(edgeMatrix));
+      if (labelParent) {
+        const point = new DOMPoint(midpoint.x, midpoint.y).matrixTransform(
+          relativeMatrix(edge.path.parentNode as SVGGraphicsElement, labelParent)
+        );
         edge.label?.setAttribute('transform', `translate(${point.x}, ${point.y})`);
       }
     }

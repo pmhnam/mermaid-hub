@@ -1,5 +1,6 @@
 <script lang="ts">
   import { sourcePosition } from '$/util/sourcePosition';
+  import { publishSourceCursor } from '$/util/canvasEvents';
   import type { EditorProps } from '$/types';
   import { env } from '$/util/env';
   import { urls, validatedState } from '$/util/state.svelte';
@@ -161,6 +162,16 @@
       }
       currentText = newText;
       onUpdate(currentText);
+    });
+    editor.onDidChangeCursorSelection((event) => {
+      if (isUpdatingFromState || !editor?.hasTextFocus() || editor.getModel() !== mermaidModel)
+        return;
+      const position = event.selection.getPosition();
+      publishSourceCursor({
+        code: mermaidModel.getValue(),
+        column: position.column,
+        lineNumber: position.lineNumber
+      });
     });
 
     editor.onMouseMove((e) => {

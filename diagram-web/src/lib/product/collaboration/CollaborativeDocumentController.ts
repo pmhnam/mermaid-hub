@@ -113,8 +113,10 @@ export class CollaborativeDocumentController {
         this.code.delete(start, currentEnd - start);
         this.code.insert(start, code.slice(start, nextEnd));
       }
-      this.config.delete(0, this.config.length);
-      this.config.insert(0, config);
+      if (this.config.toString() !== config) {
+        this.config.delete(0, this.config.length);
+        this.config.insert(0, config);
+      }
       if (!layout) {
         this.layout.clear();
         return;

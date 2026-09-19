@@ -1,5 +1,6 @@
 <script lang="ts">
   import { sourcePosition } from '$/util/sourcePosition';
+  import { publishSourceCursor } from '$/util/canvasEvents';
   import type { EditorProps } from '$/types';
   import { validatedState } from '$/util/state.svelte';
   import { json, jsonLanguage } from '@codemirror/lang-json';
@@ -50,6 +51,19 @@
           ]),
           themeCompartment.of([]),
           EditorView.updateListener.of((update) => {
+            if (
+              update.selectionSet &&
+              update.view.hasFocus &&
+              validatedState.current.editorMode === 'code'
+            ) {
+              const head = update.state.selection.main.head;
+              const line = update.state.doc.lineAt(head);
+              publishSourceCursor({
+                code: update.state.doc.toString(),
+                column: head - line.from + 1,
+                lineNumber: line.number
+              });
+            }
             if (update.docChanged) {
               const newText = update.state.doc.toString();
               if (currentText === newText) {
