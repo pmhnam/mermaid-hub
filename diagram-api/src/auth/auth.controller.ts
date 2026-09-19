@@ -7,6 +7,9 @@ import {
   Req,
   Res,
   UseGuards,
+  Query,
+  ConflictException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
@@ -18,13 +21,71 @@ import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { LocalAuthGuard } from './guards/local-auth.guard.js';
+import {
+  GoogleAuthService,
+  GOOGLE_ATTEMPT_COOKIE,
+  GOOGLE_COOKIE_PATH,
+} from './google-auth.service.js';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly config: ConfigService,
+    private readonly google: GoogleAuthService,
   ) {}
+
+  @Get('providers')
+  providers() {
+    return { google: this.google.enabled };
+  }
+
+  @Get('google')
+  async googleStart(@Res() response: Response) {
+    const attempt = await this.google.begin();
+    response.setHeader('Cache-Control', 'no-store');
+    response.cookie(GOOGLE_ATTEMPT_COOKIE, attempt.cookie, {
+      httpOnly: true,
+      secure: this.config.get('COOKIE_SECURE', 'false') === 'true',
+      sameSite: 'lax',
+      path: GOOGLE_COOKIE_PATH,
+      maxAge: 600_000,
+    });
+    response.redirect(attempt.url);
+  }
+
+  @Get('google/callback')
+  async googleCallback(
+    @Query() query: Record<string, unknown>,
+    @Req() request: Request,
+    @Res() response: Response,
+  ) {
+    if (!this.google.enabled)
+      throw new ServiceUnavailableException('Google sign-in is not configured');
+    response.setHeader('Cache-Control', 'no-store');
+    response.clearCookie(GOOGLE_ATTEMPT_COOKIE, { path: GOOGLE_COOKIE_PATH });
+    try {
+      const identity = await this.google.complete(
+        query.code,
+        query.state,
+        request.cookies?.[GOOGLE_ATTEMPT_COOKIE],
+      );
+      const result = await this.authService.loginWithGoogle(
+        identity,
+        this.metadata(request),
+      );
+      this.setRefreshCookie(response, result.refreshToken);
+      response.redirect(this.google.resultUrl('success'));
+    } catch (error) {
+      const reason =
+        error instanceof ConflictException
+          ? 'account_exists'
+          : query.error === 'access_denied'
+            ? 'cancelled'
+            : 'failed';
+      response.redirect(this.google.resultUrl(reason));
+    }
+  }
 
   @Post('register')
   async register(

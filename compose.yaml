@@ -22,6 +22,10 @@ services:
     restart: unless-stopped
     environment:
       COOKIE_SECURE: "true"
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      APP_URL: ${APP_URL:-}
       DATABASE_URL: postgresql://diagram:${POSTGRES_PASSWORD}@postgres:5432/diagram
       DB_MIGRATIONS_RUN: "true"
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}

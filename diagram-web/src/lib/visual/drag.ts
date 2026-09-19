@@ -1,4 +1,5 @@
 import type { PanZoomState } from '$/util/panZoom';
+import { erEdgeUpdater } from './erEdges';
 import {
   emptyVisualLayout,
   isVisualLayoutSupported,
@@ -26,6 +27,8 @@ interface ActiveDrag {
   key: string;
   start: DOMPoint;
   startOffset: { x: number; y: number };
+  pointerStart: { x: number; y: number };
+  moved: boolean;
 }
 
 const pointFromEvent = (svg: SVGSVGElement, event: PointerEvent): DOMPoint | undefined => {
@@ -53,10 +56,10 @@ export const setupVisualDragging = ({
   rough,
   svg
 }: DragOptions): (() => void) => {
-  if (!svg || !editable || !onChange || rough || !isVisualLayoutSupported(diagramType)) {
+  if (!svg || rough || !isVisualLayoutSupported(diagramType)) {
     return () => undefined;
   }
-  const layout = currentLayout ?? emptyVisualLayout(engine);
+  let layout = currentLayout?.engine === engine ? currentLayout : emptyVisualLayout(engine);
   for (const node of visualNodeElements(svg)) {
     const baseTransform =
       node.getAttribute('data-visual-base-transform') ?? node.getAttribute('transform') ?? '';
@@ -64,9 +67,16 @@ export const setupVisualDragging = ({
     node.setAttribute('data-visual-base-transform', baseTransform);
     if (key) {
       node.setAttribute('data-visual-node', key);
+      if (editable && onChange) {
+        node.style.cursor = 'grab';
+        node.style.touchAction = 'none';
+      }
       node.setAttribute('transform', visualTransform(baseTransform, layout.offsets[key]));
     }
   }
+  const updateEdges = diagramType?.startsWith('er') ? erEdgeUpdater(svg) : undefined;
+  updateEdges?.(layout.offsets);
+  if (!editable || !onChange) return () => undefined;
 
   let active: ActiveDrag | undefined;
   const handleDown = (event: PointerEvent): void => {
@@ -75,21 +85,30 @@ export const setupVisualDragging = ({
     const key = element?.getAttribute('data-visual-node');
     const start = pointFromEvent(svg, event);
     if (!element || !key || !start) return;
-    event.preventDefault();
     event.stopPropagation();
-    element.setPointerCapture(event.pointerId);
     active = {
       baseTransform: element.getAttribute('data-visual-base-transform') ?? '',
       element,
       key,
+      moved: false,
+      pointerStart: { x: event.clientX, y: event.clientY },
       start,
       startOffset: layout.offsets[key] ?? { x: 0, y: 0 }
     };
     panZoomState.setPanEnabled(false);
-    element.classList.add('cursor-grabbing');
   };
   const handleMove = (event: PointerEvent): void => {
     if (!active) return;
+    if (!active.moved) {
+      if (
+        Math.hypot(event.clientX - active.pointerStart.x, event.clientY - active.pointerStart.y) < 5
+      )
+        return;
+      active.moved = true;
+      active.element.setPointerCapture(event.pointerId);
+      active.element.style.cursor = 'grabbing';
+    }
+    event.preventDefault();
     const point = pointFromEvent(svg, event);
     if (!point) return;
     active.element.setAttribute(
@@ -99,6 +118,13 @@ export const setupVisualDragging = ({
         y: active.startOffset.y + point.y - active.start.y
       })
     );
+    updateEdges?.({
+      ...layout.offsets,
+      [active.key]: {
+        x: active.startOffset.x + point.x - active.start.x,
+        y: active.startOffset.y + point.y - active.start.y
+      }
+    });
   };
   const finish = (event: PointerEvent, commit: boolean): void => {
     if (!active) return;
@@ -106,14 +132,16 @@ export const setupVisualDragging = ({
     active = undefined;
     if (drag.element.hasPointerCapture(event.pointerId))
       drag.element.releasePointerCapture(event.pointerId);
-    drag.element.classList.remove('cursor-grabbing');
+    drag.element.style.cursor = 'grab';
     panZoomState.setPanEnabled(true);
+    if (!drag.moved) return;
     const point = pointFromEvent(svg, event);
     if (!commit || !point) {
       drag.element.setAttribute('transform', visualTransform(drag.baseTransform, drag.startOffset));
+      updateEdges?.(layout.offsets);
       return;
     }
-    onChange({
+    layout = {
       engine: layout.engine,
       mode: 'manual',
       offsets: {
@@ -123,12 +151,15 @@ export const setupVisualDragging = ({
           y: drag.startOffset.y + point.y - drag.start.y
         }
       }
-    });
+    };
+    onChange(layout);
   };
+  const handleUp = (event: PointerEvent): void => finish(event, true);
+  const handleCancel = (event: PointerEvent): void => finish(event, false);
   svg.addEventListener('pointerdown', handleDown, true);
   svg.addEventListener('pointermove', handleMove, true);
-  svg.addEventListener('pointerup', (event) => finish(event, true), true);
-  svg.addEventListener('pointercancel', (event) => finish(event, false), true);
+  window.addEventListener('pointerup', handleUp, true);
+  window.addEventListener('pointercancel', handleCancel, true);
   return () => {
     if (active) {
       active.element.setAttribute(
@@ -139,5 +170,7 @@ export const setupVisualDragging = ({
     }
     svg.removeEventListener('pointerdown', handleDown, true);
     svg.removeEventListener('pointermove', handleMove, true);
+    window.removeEventListener('pointerup', handleUp, true);
+    window.removeEventListener('pointercancel', handleCancel, true);
   };
 };

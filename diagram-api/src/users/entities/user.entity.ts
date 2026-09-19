@@ -25,8 +25,19 @@ export class User {
     type: 'varchar',
     length: 255,
     select: false,
+    nullable: true,
   })
-  passwordHash: string;
+  passwordHash: string | null;
+
+  @Index('uq_users_google_subject', { unique: true })
+  @Column({
+    name: 'google_subject',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+    select: false,
+  })
+  googleSubject: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

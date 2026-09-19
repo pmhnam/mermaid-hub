@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { InitialSchema1757318400000 } from './migrations/1757318400000-InitialSchema.js';
 import { PublicDiagramLinks1788940800000 } from './migrations/1788940800000-PublicDiagramLinks.js';
 import { VisualLayout1790035200000 } from './migrations/1790035200000-VisualLayout.js';
+import { GoogleSignIn1790121600000 } from './migrations/1790121600000-GoogleSignIn.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { VisualLayout1790035200000 } from './migrations/1790035200000-VisualLayo
           InitialSchema1757318400000,
           PublicDiagramLinks1788940800000,
           VisualLayout1790035200000,
+          GoogleSignIn1790121600000,
         ],
         migrationsRun: config.get('DB_MIGRATIONS_RUN', 'false') === 'true',
         ssl:

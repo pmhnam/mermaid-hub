@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sourcePosition } from '$/util/sourcePosition';
   import type { EditorProps } from '$/types';
   import { env } from '$/util/env';
   import { urls, validatedState } from '$/util/state.svelte';
@@ -257,8 +258,9 @@
       return;
     }
     editor.setModel(mermaidModel);
-    const start = mermaidModel.getPositionAt(request.start);
-    const end = mermaidModel.getPositionAt(request.end);
+    const source = request.sourceCode ?? validatedState.current.code;
+    const start = sourcePosition(source, request.start);
+    const end = sourcePosition(source, request.end);
     const range = new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column);
     editor.setSelection(range);
     editor.revealRangeInCenter(range);

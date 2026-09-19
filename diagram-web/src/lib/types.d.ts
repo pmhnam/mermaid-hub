@@ -120,6 +120,7 @@ export interface EditorProps {
 }
 
 export interface SourceRange {
+  sourceCode?: string;
   end: number;
   start: number;
 }

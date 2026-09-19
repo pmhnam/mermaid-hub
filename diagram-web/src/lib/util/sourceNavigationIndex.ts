@@ -58,6 +58,11 @@ const addChildren = (
 };
 
 const isRelationshipLine = (text: string, diagramType: string): boolean => {
+  if (diagramType.startsWith('er')) {
+    return /^\s*(?:"[^"]+"|[\w.-]+)\s+(?:[|o{}1u]+|one(?: or (?:zero|more|many))?|zero or (?:one|more|many)|only one|many(?:\([01]\))?|[01]\+)\s*(?:--|\.\.|\.-|-\.|(?:optionally )?to)\s*(?:[|o{}1u]+|one(?: or (?:zero|more|many))?|zero or (?:one|more|many)|only one|many(?:\([01]\))?|[01]\+)\s+(?:"[^"]+"|[\w.-]+)\s*:/.test(
+      text
+    );
+  }
   if (diagramType.startsWith('sequence') || diagramType.startsWith('gantt')) return false;
   if (diagramType.startsWith('requirement')) {
     return /(?:- satisfies| verifies| traces| contains| refines| derives)/i.test(text);

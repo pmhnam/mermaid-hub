@@ -60,6 +60,71 @@ API service, so the public hostname remains same-origin for the frontend.
 
 ## Updates
 
+### GitHub Actions
+
+Pushing to `main` runs `.github/workflows/deploy.yml`. The workflow connects to
+the VPS, fast-forwards the repository, rebuilds the Compose services, and checks
+the API health endpoint. It can also be started manually from the Actions tab.
+
+Create a GitHub environment named `production`, then add these environment
+secrets:
+
+| Secret               | Value                                    |
+| -------------------- | ---------------------------------------- |
+| `DEPLOY_HOST`        | VPS hostname or IP address               |
+| `DEPLOY_USER`        | SSH user, for example `ubuntu`           |
+| `DEPLOY_PORT`        | SSH port; leave empty to use `22`        |
+| `DEPLOY_PATH`        | Absolute repository path on the VPS      |
+| `DEPLOY_SSH_KEY`     | Private key authorized for `DEPLOY_USER` |
+| `DEPLOY_KNOWN_HOSTS` | Trusted SSH host-key line for the VPS    |
+
+Generate the `DEPLOY_KNOWN_HOSTS` value from a trusted machine and verify its
+fingerprint before saving it in GitHub:
+
+```sh
+ssh-keyscan -p 22 -H your-vps.example
+```
+
+The server must already contain a clone of this repository, its production
+`.env`, the external `proxy` Docker network, Docker with the Compose plugin, and
+Git credentials that can read the repository. The workflow deliberately uses
+`git pull --ff-only`; it stops instead of overwriting local server changes.
+
+### Google sign-in (optional)
+
+Create an OAuth 2.0 **Web application** client in Google Cloud / Google Auth Platform.
+Configure the consent screen and add test users while the application is in testing.
+Add this exact authorized redirect URI, using your real public hostname:
+
+```text
+https://your-domain.example/api/auth/google/callback
+```
+
+Set these backend variables in the Compose `.env` file:
+
+```dotenv
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_REDIRECT_URI=https://your-domain.example/api/auth/google/callback
+APP_URL=https://your-domain.example
+```
+
+Rebuild/restart the stack. The API runs the Google identity migration automatically;
+the login and registration pages show **Continue with Google** when all settings are
+present. No Google secret is sent to the frontend. The redirect flow uses state,
+PKCE and a nonce, verifies the Google ID token, then issues the usual application
+session cookie. Google access/refresh tokens are not stored.
+
+First sign-in creates a personal workspace. Returning users are identified by
+Google's stable subject ID. Existing password accounts are not automatically linked
+by matching email: those users must keep signing in with their password. This avoids
+silently granting access to an existing account. If consent is cancelled or validation
+fails, the login page displays a retryable error.
+
+To disable Google sign-in, leave all four variables empty. Email/password login
+continues to work. Reverting the migration requires handling any Google-only accounts
+first because they intentionally have no password hash.
+
 ```sh
 git pull
 docker compose up -d --build

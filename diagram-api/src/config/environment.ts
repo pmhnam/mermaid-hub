@@ -86,5 +86,38 @@ export function validateEnvironment(
   if (errors.length > 0) {
     throw new Error(errors.toString());
   }
+  const googleKeys = [
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET',
+    'GOOGLE_REDIRECT_URI',
+    'APP_URL',
+  ];
+  if (googleKeys.some((key) => Boolean(config[key]))) {
+    if (
+      !googleKeys.every(
+        (key) =>
+          typeof config[key] === 'string' && (config[key] as string).trim(),
+      )
+    ) {
+      throw new Error(
+        'Google sign-in requires GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI and APP_URL',
+      );
+    }
+    for (const key of ['GOOGLE_REDIRECT_URI', 'APP_URL']) {
+      const url = new URL(config[key] as string);
+      if (
+        !['http:', 'https:'].includes(url.protocol) ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.hash ||
+        (config.NODE_ENV === 'production' && url.protocol !== 'https:')
+      ) {
+        throw new Error(
+          `${key} must be a valid ${config.NODE_ENV === 'production' ? 'HTTPS' : 'HTTP(S)'} URL without credentials, query or fragment`,
+        );
+      }
+    }
+  }
   return { ...config, ...parsed };
 }

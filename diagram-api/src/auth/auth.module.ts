@@ -13,6 +13,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { LocalAuthGuard } from './guards/local-auth.guard.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { LocalStrategy } from './strategies/local.strategy.js';
+import { GoogleAuthService } from './google-auth.service.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { LocalStrategy } from './strategies/local.strategy.js';
   controllers: [AuthController],
   providers: [
     AuthService,
+    GoogleAuthService,
     LocalStrategy,
     JwtStrategy,
     LocalAuthGuard,

@@ -272,6 +272,18 @@ const annotateNestedRanges = (
   }
 
   if (!family.startsWith('sequence') && !family.startsWith('gantt')) {
+    if (family.startsWith('er')) {
+      // ELK may emit paths in layout order rather than source order. Mermaid's
+      // ER edge IDs carry the original relationship ordinal for both labels and paths.
+      for (const element of svg.querySelectorAll(
+        '[data-et="edge"], .relationshipLine, .edgeLabel .label[data-id]'
+      )) {
+        const ordinal = element.getAttribute('data-id')?.match(/^id_.*_(\d+)$/)?.[1];
+        const range = ordinal === undefined ? undefined : index.edges[Number(ordinal)];
+        if (range) setSourceRange(element, range);
+      }
+      return;
+    }
     annotateOrdered(
       [
         ...svg.querySelectorAll(

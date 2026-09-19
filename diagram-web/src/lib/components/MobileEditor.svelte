@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sourcePosition } from '$/util/sourcePosition';
   import type { EditorProps } from '$/types';
   import { validatedState } from '$/util/state.svelte';
   import { json, jsonLanguage } from '@codemirror/lang-json';
@@ -87,14 +88,17 @@
       return;
     }
     if (!collaboration) {
-      currentText = text;
-      editorView.dispatch({
-        changes: {
-          from: 0,
-          to: editorView.state.doc.length,
-          insert: text
-        }
-      });
+      currentText = text.replaceAll(/\r\n?/g, '\n');
+      // Config/layout updates must not replace identical content and reset the selection.
+      if (editorView.state.doc.toString() !== currentText) {
+        editorView.dispatch({
+          changes: {
+            from: 0,
+            to: editorView.state.doc.length,
+            insert: currentText
+          }
+        });
+      }
     }
     const stateLanguage = editorView.state.facet(language);
     const isStateJson = stateLanguage === jsonLanguage;
@@ -134,8 +138,14 @@
     ) {
       return;
     }
-    const end = Math.min(request.end, editorView.state.doc.length);
-    const start = Math.min(request.start, end);
+    const document = editorView.state.doc;
+    const toEditorOffset = (offset: number): number => {
+      const position = sourcePosition(request.sourceCode ?? validatedState.current.code, offset);
+      const line = document.line(Math.min(position.lineNumber, document.lines));
+      return Math.min(line.from + position.column - 1, line.to);
+    };
+    const end = toEditorOffset(request.end);
+    const start = Math.min(toEditorOffset(request.start), end);
     editorView.dispatch({
       effects: EditorView.scrollIntoView(EditorSelection.range(start, end), { y: 'center' }),
       selection: { anchor: start, head: end }

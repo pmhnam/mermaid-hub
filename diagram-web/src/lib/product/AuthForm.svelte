@@ -7,6 +7,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount } from 'svelte';
+  import GoogleIcon from '~icons/logos/google-icon';
 
   const { mode }: { mode: 'login' | 'register' } = $props();
   const isRegister = $derived(mode === 'register');
@@ -15,6 +16,10 @@
   let password = $state('');
   let error = $state('');
   let submitting = $state(false);
+  let googleEnabled = $state(false);
+  let googleStarting = $state(false);
+  let returnDestination = $state<string | null>(null);
+  const googleRedirectKey = 'google-login-redirect';
 
   type ProductDestination =
     | { diagramId?: string; kind: 'workspace'; workspaceId: string }
@@ -37,7 +42,7 @@
   };
 
   const continueToProduct = async (): Promise<void> => {
-    const redirect = productDestination(page.url.searchParams.get('redirect'));
+    const redirect = productDestination(page.url.searchParams.get('redirect') ?? returnDestination);
     if (redirect?.kind === 'import') {
       await goto(`${base}/import${redirect.state ? `#${redirect.state}` : ''}`);
       return;
@@ -59,9 +64,41 @@
   };
 
   onMount(async () => {
+    const googleResult = page.url.searchParams.get('google');
+    if (googleResult) {
+      returnDestination = sessionStorage.getItem(googleRedirectKey);
+      sessionStorage.removeItem(googleRedirectKey);
+      if (googleResult !== 'success') {
+        error =
+          googleResult === 'cancelled'
+            ? 'Google sign-in was cancelled. You can try again or sign in with email.'
+            : googleResult === 'account_exists'
+              ? 'An account with this email already exists. Please sign in with your password.'
+              : 'Google sign-in could not be completed. Please try again.';
+      }
+    }
+    void auth.api
+      .getAuthProviders()
+      .then((providers) => {
+        googleEnabled = providers.google;
+      })
+      .catch(() => {
+        googleEnabled = false;
+      });
     await auth.initialize();
     if (auth.current.status === 'authenticated') await continueToProduct();
+    else if (googleResult === 'success')
+      error = 'Unable to restore your Google session. Please try again.';
   });
+
+  const signInWithGoogle = (): void => {
+    if (submitting || googleStarting) return;
+    const redirect = page.url.searchParams.get('redirect') ?? returnDestination;
+    if (redirect) sessionStorage.setItem(googleRedirectKey, redirect);
+    else sessionStorage.removeItem(googleRedirectKey);
+    googleStarting = true;
+    window.location.assign(auth.api.googleSignInUrl());
+  };
 
   const submit = async (event: SubmitEvent): Promise<void> => {
     event.preventDefault();
@@ -132,6 +169,20 @@
           : 'Continue editing your saved Mermaid diagrams.'}
       </p>
 
+      {#if googleEnabled}
+        <Button
+          class="mt-8 h-11 w-full gap-3 border-slate-300 bg-white text-slate-900 hover:bg-slate-100"
+          variant="outline"
+          disabled={submitting || googleStarting}
+          onclick={signInWithGoogle}>
+          <GoogleIcon class="size-5" />
+          {googleStarting ? 'Opening Google…' : 'Continue with Google'}
+        </Button>
+        <div class="mt-6 flex items-center gap-3 text-xs text-slate-500">
+          <span class="h-px flex-1 bg-slate-200"></span>or continue with email<span
+            class="h-px flex-1 bg-slate-200"></span>
+        </div>
+      {/if}
       <form class="mt-8 space-y-5" onsubmit={submit} novalidate>
         {#if isRegister}
           <div class="space-y-2">
@@ -184,7 +235,7 @@
         <Button
           class="h-11 w-full bg-slate-950 text-white hover:bg-slate-800"
           type="submit"
-          disabled={submitting}>
+          disabled={submitting || googleStarting}>
           {submitting ? 'Please wait…' : isRegister ? 'Create account' : 'Sign in'}
         </Button>
       </form>

@@ -27,12 +27,12 @@
 
   const engines: { description: string; engine: LayoutEngine; label: string }[] = [
     {
-      description: 'Arranges nodes in ordered levels following their hierarchy.',
+      description: 'Dagre · Arrange tables and nodes in ordered levels.',
       engine: 'dagre',
       label: 'Hierarchical'
     },
     {
-      description: 'Rearranges nodes based on their context and connections.',
+      description: 'ELK · Arrange connected tables and nodes automatically.',
       engine: 'elk',
       label: 'Adaptive'
     }
@@ -49,20 +49,32 @@
   <Popover.Trigger
     disabled={disabled || unsupported}
     aria-label="Choose layout"
-    title={unsupported ? 'Layout is managed by this diagram type' : 'Layout'}
-    class={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'h-8 gap-1 px-2')}>
+    title={unsupported
+      ? 'Layout is managed by this diagram type'
+      : disabled
+        ? 'Layout is read-only'
+        : 'Choose automatic layout'}
+    class={cn(
+      buttonVariants({ variant: 'outline', size: 'sm' }),
+      'h-8 gap-1.5 bg-background px-2 shadow-sm'
+    )}>
     <AccountTreeIcon />
-    <span class="hidden sm:inline">Layout</span>
+    <span>{selected === 'elk' ? 'Adaptive' : 'Hierarchical'}</span>
     <KeyboardArrowDownIcon class="size-4" />
   </Popover.Trigger>
-  <Popover.Content side="top" align="end" class="w-72 p-1">
+  <Popover.Content side="top" align="start" class="w-72 max-w-[calc(100vw-2rem)] p-1">
     <div class="px-3 py-2 text-xs font-semibold text-muted-foreground">Layout</div>
+    <p class="px-3 pb-2 text-xs text-muted-foreground">
+      Switching layout resets manually moved nodes.
+    </p>
     {#each engines as option (option.engine)}
       <Popover.Close
         disabled={disabled || unsupported}
+        aria-pressed={selected === option.engine}
         class={cn(
           buttonVariants({ variant: 'ghost', size: 'sm' }),
-          'h-auto w-full justify-start p-2'
+          'h-auto w-full items-start justify-start whitespace-normal p-2',
+          selected === option.engine && 'bg-accent'
         )}
         onclick={() => choose(option.engine)}>
         <AccountTreeIcon class="mt-0.5 shrink-0" />

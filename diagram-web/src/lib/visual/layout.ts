@@ -132,8 +132,13 @@ export const visualNodeKey = (element: Element): string | undefined => {
   const value = element.getAttribute('data-id') ?? element.getAttribute('id');
   if (!value) return undefined;
   const withoutIndex = value.replace(/-\d+$/, '');
-  const prefix = nodePrefixes.find((candidate) => withoutIndex.startsWith(candidate));
-  return prefix ? withoutIndex.slice(prefix.length) : undefined;
+  for (const prefix of nodePrefixes) {
+    const index = withoutIndex.indexOf(prefix);
+    if (index === 0 || (index > 0 && withoutIndex[index - 1] === '-')) {
+      return withoutIndex.slice(index + prefix.length);
+    }
+  }
+  return undefined;
 };
 
 export const visualNodeElements = (svg: SVGSVGElement): SVGGElement[] =>

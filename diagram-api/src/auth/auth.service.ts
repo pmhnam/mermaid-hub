@@ -20,6 +20,7 @@ import {
 import { AuthenticatedUser, SessionMetadata } from './auth.types.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { AuthSession } from './entities/auth-session.entity.js';
+import type { GoogleIdentity } from './google-auth.service.js';
 import {
   generateRefreshToken,
   hashRefreshToken,
@@ -90,12 +91,62 @@ export class AuthService {
       .where('lower(user.email) = lower(:email)', { email: email.trim() })
       .andWhere('user.deletedAt IS NULL')
       .getOne();
-    if (!user || !(await verify(user.passwordHash, password))) return null;
+    if (!user?.passwordHash || !(await verify(user.passwordHash, password)))
+      return null;
     return this.toPublicUser(user);
   }
 
   issueTokens(user: AuthenticatedUser, metadata: SessionMetadata) {
     return this.createSession(user, metadata);
+  }
+
+  async loginWithGoogle(identity: GoogleIdentity, metadata: SessionMetadata) {
+    const user = await this.dataSource.transaction(async (manager) => {
+      // Serialize first sign-ins for one Google identity across API instances.
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `google:${identity.subject}`,
+      ]);
+      const existing = await manager.findOneBy(User, {
+        googleSubject: identity.subject,
+      });
+      if (existing) return existing;
+      const emailOwner = await manager
+        .getRepository(User)
+        .createQueryBuilder('user')
+        .where('lower(user.email) = lower(:email)', { email: identity.email })
+        .getOne();
+      if (emailOwner)
+        throw new ConflictException(
+          'Sign in with your password for this email address.',
+        );
+      const created = await manager.save(
+        User,
+        manager.create(User, {
+          email: identity.email,
+          displayName: identity.displayName,
+          googleSubject: identity.subject,
+          passwordHash: null,
+        }),
+      );
+      const workspace = await manager.save(
+        Workspace,
+        manager.create(Workspace, {
+          name: `${created.displayName}'s workspace`,
+          kind: WorkspaceKind.Personal,
+          ownerId: created.id,
+        }),
+      );
+      await manager.save(
+        WorkspaceMember,
+        manager.create(WorkspaceMember, {
+          workspaceId: workspace.id,
+          userId: created.id,
+          role: WorkspaceRole.Owner,
+        }),
+      );
+      return created;
+    });
+    return this.issueTokens(this.toPublicUser(user), metadata);
   }
 
   async refresh(token: string | undefined, metadata: SessionMetadata) {

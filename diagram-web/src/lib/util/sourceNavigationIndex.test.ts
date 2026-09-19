@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { buildSourceNavigationIndex, sourceLines } from './sourceNavigationIndex';
 
 describe('source navigation index', () => {
+  it('does not count relationship-like text in attribute comments as edges', () => {
+    const code =
+      'erDiagram\nPRODUCT {\n string note "old -- new"\n}\nPRODUCT ||--o{ IMAGE : contains';
+    const index = buildSourceNavigationIndex(code, 'er');
+    expect(index.edges.map((range) => code.slice(range.start, range.end))).toEqual([
+      'PRODUCT ||--o{ IMAGE : contains'
+    ]);
+  });
   it('preserves offsets for CRLF source', () => {
     const lines = sourceLines('erDiagram\r\n  CUSTOMER {\r\n    UUID id PK\r\n  }');
 

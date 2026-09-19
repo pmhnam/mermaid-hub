@@ -160,8 +160,8 @@ describe('preview source navigation', () => {
       [
         '<svg>',
         '<g class="edgePaths">',
-        '<path data-et="edge" data-id="id_products_variants_0" />',
         '<path data-et="edge" data-id="id_products_images_1" />',
+        '<path data-et="edge" data-id="id_products_variants_0" />',
         '</g>',
         '<g class="edgeLabels">',
         '<g class="edgeLabel"><g class="label" data-id="id_products_variants_0"><text>contains</text></g></g>',

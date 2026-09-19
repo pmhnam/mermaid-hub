@@ -59,6 +59,14 @@ export class ApiClient {
     return this.startSession('/api/auth/login', input);
   }
 
+  getAuthProviders(): Promise<{ google: boolean }> {
+    return this.fetchJson('/api/auth/providers', {});
+  }
+
+  googleSignInUrl(): string {
+    return `${this.baseUrl}/api/auth/google`;
+  }
+
   async register(input: RegisterInput): Promise<AuthResponse> {
     return this.startSession('/api/auth/register', input);
   }

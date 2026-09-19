@@ -34,11 +34,12 @@
   let code = '';
   let config = '';
   let container: HTMLDivElement | undefined = $state();
-  let rough: boolean;
+  let rough = $state(false);
   let view: HTMLDivElement | undefined = $state();
   let error = $state<Error | undefined>();
   let errorTimer: ReturnType<typeof setTimeout> | undefined;
   let hasRenderedDiagram = $state(false);
+  let navigationMessage = $state('');
   let panZoom = true;
   let manualUpdate = true;
   let renderedDiagramType = '';
@@ -170,7 +171,9 @@
     const range = sourceRangeForSvgTarget(code, renderedDiagramType, event.target);
     if (!range) return;
     event.preventDefault();
-    onSourceSelect(range);
+    onSourceSelect({ ...range, sourceCode: code });
+    const line = code.slice(0, range.start).split('\n').length;
+    navigationMessage = `Source selected at line ${line}`;
   };
 </script>
 
@@ -181,9 +184,17 @@
   bind:this={view}
   role="application"
   aria-label="Interactive diagram preview"
+  class:source-navigation={Boolean(onSourceSelect) && !rough}
   ondblclick={handleDoubleClick}
   class={['relative h-full w-full', shouldShowGrid && `grid-bg-${mode.current}`]}>
   <div id="container" bind:this={container} class="h-full overflow-auto"></div>
+  {#if onSourceSelect && !rough && hasRenderedDiagram}
+    <div
+      class="pointer-events-none absolute bottom-14 left-1/2 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-md border bg-background/90 px-2 py-1 text-center text-xs text-muted-foreground shadow-sm">
+      {editable ? 'Drag entities to move · ' : ''}Double-click a field or label to open source
+    </div>
+    <span class="sr-only" role="status">{navigationMessage}</span>
+  {/if}
   {#if error}
     <PreviewErrorOverlay
       {error}
@@ -196,6 +207,16 @@
 </div>
 
 <style>
+  .source-navigation :global([data-source-start]) {
+    cursor: pointer;
+  }
+  .source-navigation :global(.attribute-name:hover),
+  .source-navigation :global(.attribute-type:hover),
+  .source-navigation :global(.attribute-keys:hover),
+  .source-navigation :global(.attribute-comment:hover),
+  .source-navigation :global(.edgeLabel .label[data-source-start]:hover) {
+    text-decoration: underline;
+  }
   .grid-bg-light {
     background-size: 30px 30px;
     background-image: radial-gradient(circle, #e4e4e48c 2px, #0000 2px);
