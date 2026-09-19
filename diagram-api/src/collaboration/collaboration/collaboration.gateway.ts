@@ -29,6 +29,9 @@ export class CollaborationGateway
     client: WebSocket,
     request: IncomingMessage,
   ): Promise<void> {
+    // Loading/authenticating a room is async. Keep the client's initial Yjs sync
+    // frame queued until the room and message listener are both ready.
+    client.pause();
     try {
       const url = new URL(request.url ?? '', 'http://localhost');
       const diagramId = url.searchParams.get('diagramId');
@@ -63,6 +66,8 @@ export class CollaborationGateway
         `Collaboration connection rejected: ${error instanceof Error ? error.message : 'unknown error'}`,
       );
       client.close(4500, 'Unable to join collaboration room');
+    } finally {
+      client.resume();
     }
   }
 
