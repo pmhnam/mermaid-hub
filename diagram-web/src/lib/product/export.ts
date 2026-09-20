@@ -1,7 +1,9 @@
 import { render as renderMermaid } from '$lib/util/mermaid';
 import type { MermaidConfig } from 'mermaid';
+import { exportErSql } from '$/sql/mermaidSql';
+import type { SqlDialect } from '$/sql/types';
 
-export type DiagramExportFormat = 'png' | 'svg' | 'pdf' | 'mmd';
+export type DiagramExportFormat = 'png' | 'svg' | 'pdf' | 'mmd' | 'sql';
 
 export type DiagramExportBackground =
   | { type: 'white' }
@@ -15,6 +17,7 @@ export interface DiagramExportOptions {
   config: string;
   format: DiagramExportFormat;
   scale?: number;
+  sqlDialect?: SqlDialect;
   svgElement: SVGSVGElement;
   title: string;
 }
@@ -306,6 +309,10 @@ export const exportDiagram = async (
   options: DiagramExportOptions
 ): Promise<DiagramExportResult> => {
   const filename = createExportFilename(options.title, options.format);
+  if (options.format === 'sql') {
+    const result = exportErSql(options.code, options.sqlDialect ?? 'postgresql');
+    return { blob: new Blob([result.sql], { type: 'application/sql' }), filename };
+  }
   if (options.format === 'mmd') {
     return {
       blob: new Blob([buildMermaidFile(options.code, options.config)], { type: 'text/plain' }),

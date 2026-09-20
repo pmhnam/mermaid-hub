@@ -7,6 +7,8 @@
   import { SOURCE_SELECTION_EVENT, type SourceCursor } from '$/util/canvasEvents';
   import CanvasMinimap from './CanvasMinimap.svelte';
   import ExportDialog from '$/product/ExportDialog.svelte';
+  import SqlImportDialog from './SqlImportDialog.svelte';
+  import { emptyVisualLayout } from '$/visual/layout';
   import ArrangePanel from './ArrangePanel.svelte';
   let {
     model,
@@ -18,6 +20,16 @@
   let entityName = $state('');
   let working = $state(false);
   let exportOpen = $state(false);
+  let importOpen = $state(false);
+  const importSchema = async (code: string) => {
+    const applied = await model.editDocument({
+      code,
+      config: '{}',
+      resetView: true,
+      visualLayout: emptyVisualLayout('dagre')
+    });
+    if (!applied) throw new Error(model.message);
+  };
   let arrangeOpen = $state(false);
   let viewport = $state<CanvasViewport>();
   const item = $derived(model.selection[0]);
@@ -185,6 +197,12 @@
     ...(editable
       ? [
           { label: 'Undo layout', run: () => model.undo() },
+          {
+            label: 'Import SQL schema',
+            run: () => {
+              importOpen = true;
+            }
+          },
           { label: 'Redo layout', run: () => model.undo(true) },
           { label: 'Reset selected positions', run: () => model.resetPositions() },
           {
@@ -551,6 +569,7 @@
   svgElement={model.svg ?? null}
   getSvgElement={() => model.svg ?? null}
   title="Diagram" />
+<SqlImportDialog bind:open={importOpen} onImport={importSchema} replacesCurrent />
 {#if viewport && (model.guides.x !== undefined || model.guides.y !== undefined)}
   <svg
     class="pointer-events-none absolute inset-x-0 z-10 w-full"

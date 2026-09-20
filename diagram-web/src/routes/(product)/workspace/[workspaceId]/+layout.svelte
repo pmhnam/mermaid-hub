@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import AppearanceToggle from '$lib/components/AppearanceToggle.svelte';
+  import SqlImportDialog from '$lib/components/SqlImportDialog.svelte';
+  import ImportIcon from '~icons/material-symbols/upload-file-outline-rounded';
   import { Input } from '$lib/components/ui/input';
   import { auth } from '$lib/product/auth.svelte';
   import { ApiError } from '$lib/product/api';
@@ -32,6 +34,17 @@
   let error = $state('');
   let sidebarOpen = $state(false);
   let sidebarCollapsed = $state(false);
+  let sqlImportOpen = $state(false);
+  const importSchema = async (code: string, title: string) => {
+    const diagram = await auth.api.createDiagram(params.workspaceId, {
+      currentConfig: '{}',
+      currentContent: code,
+      title
+    });
+    await loadTree();
+    sidebarOpen = false;
+    await goto(`${base}/workspace/${params.workspaceId}/diagram/${diagram.id}`);
+  };
   let creation = $state<'diagram' | 'folder' | null>(null);
   let name = $state('');
   let folderId = $state('');
@@ -284,6 +297,17 @@
       </Button>
     </div>
 
+    <div class="px-3 pb-3">
+      <Button
+        class="w-full border-white/15 bg-white/5 text-slate-100 hover:bg-white/10"
+        size="sm"
+        variant="outline"
+        aria-label="Import SQL"
+        title="Import SQL schema"
+        onclick={() => (sqlImportOpen = true)}
+        ><ImportIcon /><span class:sr-only={sidebarCollapsed}>Import SQL</span></Button>
+    </div>
+
     {#if creation && !sidebarCollapsed}
       <form
         class="mx-4 mb-4 space-y-3 rounded-lg border border-white/10 bg-white/5 p-3"
@@ -484,3 +508,4 @@
     </div>
   </main>
 </div>
+<SqlImportDialog bind:open={sqlImportOpen} onImport={importSchema} />

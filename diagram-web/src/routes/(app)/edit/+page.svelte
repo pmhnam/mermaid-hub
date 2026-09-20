@@ -30,6 +30,7 @@
   import HistoryIcon from '~icons/material-symbols/history';
   import GearIcon from '~icons/material-symbols/settings-outline-rounded';
   import MoreIcon from '~icons/material-symbols/more-horiz';
+  import SqlImportDialog from '$/components/SqlImportDialog.svelte';
 
   const panZoomState = new PanZoomState();
 
@@ -82,6 +83,17 @@
   let isMobileHistoryOpen = $state(false);
   let isMobileMenuOpen = $state(false);
   let isShareOpen = $state(false);
+  let sqlImportOpen = $state(false);
+  const importSchema = (code: string) => {
+    updateCodeStore({
+      code,
+      mermaid: '{}',
+      pan: undefined,
+      visualLayout: undefined,
+      zoom: undefined
+    });
+    isViewMode = true;
+  };
 
   let editorPane: Resizable.Pane | undefined;
   $effect(() => {
@@ -119,6 +131,13 @@
             class="justify-start"
             onclick={() => {
               isMobileMenuOpen = false;
+              sqlImportOpen = true;
+            }}>Import SQL</Button>
+          <Button
+            variant="ghost"
+            class="justify-start"
+            onclick={() => {
+              isMobileMenuOpen = false;
               isShareOpen = true;
             }}>Share</Button>
           <Button
@@ -141,6 +160,11 @@
   {/snippet}
 
   <Navbar {mobileActions} mobileToggle={isMobile ? mobileToggle : undefined}>
+    <Button
+      class="hidden sm:inline-flex"
+      variant="outline"
+      size="sm"
+      onclick={() => (sqlImportOpen = true)}>Import SQL</Button>
     <Toggle bind:pressed={isHistoryOpen} size="sm" title="History" aria-label="History">
       <HistoryIcon />
     </Toggle>
@@ -209,6 +233,7 @@
   </div>
 </div>
 
+<SqlImportDialog bind:open={sqlImportOpen} onImport={importSchema} replacesCurrent />
 <Dialog.Root bind:open={isMobileHistoryOpen}>
   <Dialog.Content class="flex max-h-[90vh] flex-col sm:hidden">
     <Dialog.Header>
