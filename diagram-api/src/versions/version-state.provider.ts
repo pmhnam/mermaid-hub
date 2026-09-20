@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { Diagram } from '../diagrams/entities/diagram.entity.js';
 
 export interface DiagramVisualLayout {
+  arrangement?: {
+    version: 1;
+    assignments: { tableId: string; service: string; database: string }[];
+  };
   edgeRoutes?: Record<string, { x: number; y: number }[]>;
   engine: string;
   mode: string;

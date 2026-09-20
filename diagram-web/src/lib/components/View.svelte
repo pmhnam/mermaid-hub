@@ -18,6 +18,7 @@
   import CanvasTools from './CanvasTools.svelte';
   import { CanvasModel, type CanvasDocument } from '$/visual/canvasModel.svelte';
   import { previewErEdges } from '$/visual/erEdges';
+  import { drawArrangeGroups } from '$/visual/arrangeGroups';
 
   let {
     onSourceSelect,
@@ -142,6 +143,7 @@
             JSON.stringify(renderedLayout?.offsets ?? {})
         ) {
           previewErEdges(canvas.svg, currentVisualLayout);
+          drawArrangeGroups(canvas.svg, currentVisualLayout);
           canvas.layout = currentVisualLayout;
           canvas.syncSelection();
           renderedLayout = currentVisualLayout;

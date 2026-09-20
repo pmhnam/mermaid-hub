@@ -76,6 +76,7 @@ export class CollaborativeDocumentController {
 
   getVisualLayout(): VisualLayout | undefined {
     return parseVisualLayout({
+      arrangement: this.layout.get('arrangement'),
       edgeRoutes: this.layout.get('edgeRoutes'),
       engine: this.layout.get('engine'),
       mode: this.layout.get('mode'),
@@ -92,6 +93,8 @@ export class CollaborativeDocumentController {
       this.layout.set('engine', layout.engine);
       this.layout.set('mode', layout.mode);
       this.layout.set('offsets', layout.offsets);
+      if (layout.arrangement) this.layout.set('arrangement', layout.arrangement);
+      else this.layout.delete('arrangement');
       if (layout.edgeRoutes) this.layout.set('edgeRoutes', layout.edgeRoutes);
       else this.layout.delete('edgeRoutes');
     });
@@ -127,6 +130,8 @@ export class CollaborativeDocumentController {
       this.layout.set('engine', layout.engine);
       this.layout.set('mode', layout.mode);
       this.layout.set('offsets', layout.offsets);
+      if (layout.arrangement) this.layout.set('arrangement', layout.arrangement);
+      else this.layout.delete('arrangement');
       if (layout.edgeRoutes) this.layout.set('edgeRoutes', layout.edgeRoutes);
       else this.layout.delete('edgeRoutes');
     });

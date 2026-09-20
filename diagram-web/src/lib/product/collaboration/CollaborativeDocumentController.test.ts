@@ -53,6 +53,10 @@ describe('CollaborativeDocumentController', () => {
       user: { displayName: 'Ada', id: 'user-1' }
     });
     const layout = {
+      arrangement: {
+        version: 1 as const,
+        assignments: [{ tableId: 'A', service: 'Orders', database: 'orders' }]
+      },
       edgeRoutes: { '["A","B",0]': [{ x: 120, y: 100 }] },
       engine: 'elk' as const,
       mode: 'manual' as const,
@@ -64,6 +68,7 @@ describe('CollaborativeDocumentController', () => {
     expect(controller.getVisualLayout()).toEqual(layout);
     controller.setVisualLayout({ engine: 'elk', mode: 'auto', offsets: {} });
     expect(controller.getVisualLayout()?.edgeRoutes).toBeUndefined();
+    expect(controller.getVisualLayout()?.arrangement).toBeUndefined();
     controller.destroy();
   });
   it('updates code, config, and visual layout in one transaction', () => {

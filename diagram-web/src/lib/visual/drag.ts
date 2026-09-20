@@ -1,6 +1,7 @@
 import type { PanZoomState } from '$/util/panZoom';
 import { erEdgeUpdater } from './erEdges';
 import { elementBounds } from './canvasGraph';
+import { drawArrangeGroups } from './arrangeGroups';
 import {
   emptyVisualLayout,
   isVisualLayoutSupported,
@@ -95,6 +96,7 @@ export const setupVisualDragging = ({
     }
   }
   updateEdges?.(layout.offsets, layout.edgeRoutes);
+  drawArrangeGroups(svg, layout);
   if (!editable || !onChange) return () => undefined;
 
   let active: ActiveDrag | undefined;
@@ -179,6 +181,7 @@ export const setupVisualDragging = ({
       );
     }
     updateEdges?.(offsets, layout.edgeRoutes);
+    drawArrangeGroups(svg, layout);
   };
   const finish = (event: PointerEvent | undefined, commit: boolean): void => {
     if (!active || (event && active.pointerId !== event.pointerId)) return;
@@ -195,6 +198,7 @@ export const setupVisualDragging = ({
       for (const node of drag.group)
         node.element.setAttribute('transform', visualTransform(node.baseTransform, node.offset));
       updateEdges?.(layout.offsets, layout.edgeRoutes);
+      drawArrangeGroups(svg, layout);
       return;
     }
     layout = {

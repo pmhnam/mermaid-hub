@@ -308,6 +308,8 @@ export class CanvasModel {
         const layoutMatches =
           !expected.visualLayout ||
           (this.layout.engine === expected.visualLayout.engine &&
+            JSON.stringify(this.layout.arrangement) ===
+              JSON.stringify(expected.visualLayout.arrangement) &&
             JSON.stringify(Object.entries(this.layout.offsets).sort()) ===
               JSON.stringify(Object.entries(expected.visualLayout.offsets).sort()) &&
             JSON.stringify(Object.entries(this.layout.edgeRoutes ?? {}).sort()) ===

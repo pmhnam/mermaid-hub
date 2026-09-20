@@ -7,6 +7,7 @@
   import { SOURCE_SELECTION_EVENT, type SourceCursor } from '$/util/canvasEvents';
   import CanvasMinimap from './CanvasMinimap.svelte';
   import ExportDialog from '$/product/ExportDialog.svelte';
+  import ArrangePanel from './ArrangePanel.svelte';
   let {
     model,
     editable,
@@ -17,6 +18,7 @@
   let entityName = $state('');
   let working = $state(false);
   let exportOpen = $state(false);
+  let arrangeOpen = $state(false);
   let viewport = $state<CanvasViewport>();
   const item = $derived(model.selection[0]);
   const results = $derived(
@@ -38,6 +40,7 @@
     })
   );
   const open = async (panel: 'search' | 'properties' | 'commands') => {
+    arrangeOpen = false;
     model.panel = model.panel === panel ? null : panel;
     model.menu = undefined;
     await tick();
@@ -98,7 +101,24 @@
         code,
         config: model.config,
         ...(rename
-          ? { visualLayout: { ...model.layout, ...(edgeRoutes ? { edgeRoutes } : {}), offsets } }
+          ? {
+              visualLayout: {
+                ...model.layout,
+                ...(edgeRoutes ? { edgeRoutes } : {}),
+                offsets,
+                ...(model.layout.arrangement
+                  ? {
+                      arrangement: {
+                        ...model.layout.arrangement,
+                        assignments: model.layout.arrangement.assignments.map((assignment) => ({
+                          ...assignment,
+                          tableId: assignment.tableId === oldName ? nextName : assignment.tableId
+                        }))
+                      }
+                    }
+                  : {})
+              }
+            }
           : {})
       });
       if (applied && rename) model.selected = [nextName];
@@ -196,6 +216,7 @@
       }
       if (typing) return;
       if (event.key === 'Escape') {
+        arrangeOpen = false;
         model.menu = undefined;
         model.panel = null;
         if (model.presenting) void present();
@@ -256,6 +277,14 @@
     <button class="tool" title="Commands (Ctrl/⌘ K)" onclick={() => open('commands')}>⌘K</button>
     {#if editable}<button class="tool" onclick={() => open('properties')}>Style</button>{/if}
     {#if editable && !model.presenting}
+      {#if model.type.startsWith('er')}<button
+          class="tool"
+          aria-expanded={arrangeOpen}
+          onclick={() => {
+            arrangeOpen = !arrangeOpen;
+            model.panel = null;
+          }}>AI Arrange</button
+        >{/if}
       <button
         class="tool"
         disabled={!model.canUndo}
@@ -404,6 +433,9 @@
           >{/if}
       {/if}
     </section>
+  {/if}
+  {#if arrangeOpen && editable && model.type.startsWith('er')}
+    <ArrangePanel {model} close={() => (arrangeOpen = false)} />
   {/if}
   {#if model.selected.length && !model.presenting}
     <div

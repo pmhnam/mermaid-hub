@@ -1,5 +1,6 @@
 import type { MermaidConfig } from 'mermaid';
 import { isAlias, isScalar, parseDocument } from 'yaml';
+import { parseArrangement, type Arrangement } from './arrangement';
 
 export type LayoutEngine = 'dagre' | 'elk';
 
@@ -9,6 +10,7 @@ export interface VisualLayoutOffset {
 }
 
 export interface VisualLayout {
+  arrangement?: Arrangement;
   edgeRoutes?: Record<string, VisualLayoutOffset[]>;
   engine: LayoutEngine;
   mode: 'auto' | 'manual';
@@ -137,6 +139,9 @@ export const parseVisualLayout = (value: unknown): VisualLayout | undefined => {
         )
       : undefined;
   return {
+    ...(parseArrangement(layout.arrangement)
+      ? { arrangement: parseArrangement(layout.arrangement) }
+      : {}),
     ...(edgeRoutes ? { edgeRoutes } : {}),
     engine: layout.engine,
     mode: layout.mode,

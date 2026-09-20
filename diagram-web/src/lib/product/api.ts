@@ -1,3 +1,4 @@
+import type { ArrangeGraph, TableAssignment } from '$/visual/arrangement';
 import type {
   AuthResponse,
   AddMemberInput,
@@ -47,6 +48,11 @@ const responseError = async (response: Response): Promise<ApiError> => {
 };
 
 export class ApiClient {
+  arrangeErd(
+    input: ArrangeGraph & { instruction: string }
+  ): Promise<{ assignments: TableAssignment[] }> {
+    return this.request('/api/ai/arrange', { body: JSON.stringify(input), method: 'POST' });
+  }
   private accessToken: string | null = null;
   private refreshRequest: Promise<AuthResponse> | null = null;
 

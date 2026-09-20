@@ -13,6 +13,7 @@ import { VersionsModule } from './versions/versions.module.js';
 import { CollaborationModule } from './collaboration/collaboration.module.js';
 import { LoggerModule } from 'nestjs-pino';
 import { pinoHttpOptions } from './config/logger.js';
+import { ArrangeModule } from './ai/arrange.module.js';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { pinoHttpOptions } from './config/logger.js';
     PermissionsModule,
     CollaborationModule,
     VersionsModule,
+    ArrangeModule,
   ],
   controllers: [AppController],
   providers: [],
