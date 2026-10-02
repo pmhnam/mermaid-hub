@@ -435,7 +435,7 @@
 
   {#snippet previewToolbarEnd()}
     <div
-      class="flex max-w-full min-w-0 items-center gap-2 overflow-x-auto"
+      class="ml-auto flex max-w-full min-w-0 items-center gap-2 overflow-x-auto"
       data-testid="preview-toolbar">
       <LayoutToolbar
         compact

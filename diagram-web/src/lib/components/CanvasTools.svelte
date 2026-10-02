@@ -305,7 +305,7 @@
       class={[
         'flex items-center gap-1 rounded-lg border bg-background/95 p-1 shadow-sm',
         toolbarStart || toolbarEnd
-          ? 'min-w-0 flex-1 overflow-x-auto whitespace-nowrap'
+          ? 'min-w-0 flex-initial overflow-x-auto whitespace-nowrap'
           : 'flex-wrap'
       ]}>
       <button
