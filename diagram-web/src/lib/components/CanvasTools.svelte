@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, type Snippet } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import type { CanvasModel } from '$/visual/canvasModel.svelte';
   import type { CanvasViewport } from '$/util/panZoom';
@@ -13,8 +13,16 @@
   let {
     model,
     editable,
-    onComment
-  }: { model: CanvasModel; editable: boolean; onComment?: (target?: string) => void } = $props();
+    onComment,
+    toolbarStart,
+    toolbarEnd
+  }: {
+    model: CanvasModel;
+    editable: boolean;
+    onComment?: (target?: string) => void;
+    toolbarStart?: Snippet;
+    toolbarEnd?: Snippet;
+  } = $props();
   let input: HTMLInputElement | undefined = $state();
   let text = $state('');
   let entityName = $state('');
@@ -285,39 +293,54 @@
   });
 </script>
 
-<div data-canvas-tools class="absolute top-14 left-3 z-30 max-w-[calc(100%-1.5rem)] text-sm">
-  <div class="flex flex-wrap items-center gap-1 rounded-lg border bg-background/95 p-1 shadow-sm">
-    <button
-      class="tool"
-      aria-label="Find in diagram"
-      aria-expanded={model.panel === 'search'}
-      onclick={() => open('search')}>Find</button>
-    <button class="tool" title="Commands (Ctrl/⌘ K)" onclick={() => open('commands')}>⌘K</button>
-    {#if editable}<button class="tool" onclick={() => open('properties')}>Style</button>{/if}
-    {#if editable && !model.presenting}
-      {#if model.type.startsWith('er')}<button
+<div
+  data-canvas-tools
+  class={[
+    'absolute z-30 text-sm',
+    toolbarStart || toolbarEnd ? 'top-3 right-3 left-3' : 'top-14 left-3 max-w-[calc(100%-1.5rem)]'
+  ]}>
+  <div class={toolbarStart || toolbarEnd ? 'flex flex-wrap items-center gap-2' : undefined}>
+    {#if toolbarStart}{@render toolbarStart()}{/if}
+    <div
+      class={[
+        'flex items-center gap-1 rounded-lg border bg-background/95 p-1 shadow-sm',
+        toolbarStart || toolbarEnd
+          ? 'min-w-0 flex-1 overflow-x-auto whitespace-nowrap'
+          : 'flex-wrap'
+      ]}>
+      <button
+        class="tool"
+        aria-label="Find in diagram"
+        aria-expanded={model.panel === 'search'}
+        onclick={() => open('search')}>Find</button>
+      <button class="tool" title="Commands (Ctrl/⌘ K)" onclick={() => open('commands')}>⌘K</button>
+      {#if editable}<button class="tool" onclick={() => open('properties')}>Style</button>{/if}
+      {#if editable && !model.presenting}
+        {#if model.type.startsWith('er')}<button
+            class="tool"
+            aria-expanded={arrangeOpen}
+            onclick={() => {
+              arrangeOpen = !arrangeOpen;
+              model.panel = null;
+            }}>AI Arrange</button
+          >{/if}
+        <button
           class="tool"
-          aria-expanded={arrangeOpen}
-          onclick={() => {
-            arrangeOpen = !arrangeOpen;
-            model.panel = null;
-          }}>AI Arrange</button
-        >{/if}
-      <button
-        class="tool"
-        disabled={!model.canUndo}
-        aria-label="Undo layout"
-        onclick={() => model.undo()}>↶</button>
-      <button
-        class="tool"
-        disabled={!model.canRedo}
-        aria-label="Redo layout"
-        onclick={() => model.undo(true)}>↷</button>
-      <button class="tool" aria-pressed={model.snap} onclick={() => (model.snap = !model.snap)}
-        >Snap</button>
-    {/if}
-    <button class="tool" onclick={present}
-      >{model.presenting ? 'Exit presentation' : 'Present'}</button>
+          disabled={!model.canUndo}
+          aria-label="Undo layout"
+          onclick={() => model.undo()}>↶</button>
+        <button
+          class="tool"
+          disabled={!model.canRedo}
+          aria-label="Redo layout"
+          onclick={() => model.undo(true)}>↷</button>
+        <button class="tool" aria-pressed={model.snap} onclick={() => (model.snap = !model.snap)}
+          >Snap</button>
+      {/if}
+      <button class="tool" onclick={present}
+        >{model.presenting ? 'Exit presentation' : 'Present'}</button>
+    </div>
+    {#if toolbarEnd}{@render toolbarEnd()}{/if}
   </div>
   {#if model.panel}
     <section

@@ -33,7 +33,7 @@
   let tree = $state<WorkspaceTree | null>(null);
   let error = $state('');
   let sidebarOpen = $state(false);
-  let sidebarCollapsed = $state(false);
+  let sidebarCollapsed = $state(true);
   let sqlImportOpen = $state(false);
   const importSchema = async (code: string, title: string) => {
     const diagram = await auth.api.createDiagram(params.workspaceId, {

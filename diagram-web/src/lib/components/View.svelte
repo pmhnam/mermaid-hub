@@ -12,7 +12,7 @@
   import uniqueID from 'lodash-es/uniqueId';
   import type { MermaidConfig } from 'mermaid';
   import { mode } from 'mode-watcher';
-  import { onMount, untrack } from 'svelte';
+  import { onMount, untrack, type Snippet } from 'svelte';
   import { setupVisualDragging } from '$/visual/drag';
   import { layoutEngineFromDocument, type VisualLayout } from '$/visual/layout';
   import CanvasTools from './CanvasTools.svelte';
@@ -28,7 +28,9 @@
     visualLayout,
     onVisualLayoutChange,
     onDocumentChange,
-    onComment
+    onComment,
+    toolbarStart,
+    toolbarEnd
   }: {
     editable?: boolean;
     onSourceSelect?: (range: SourceRange) => void;
@@ -37,6 +39,8 @@
     onComment?: (target?: string) => void;
     panZoomState?: PanZoomState;
     shouldShowGrid?: boolean;
+    toolbarStart?: Snippet;
+    toolbarEnd?: Snippet;
     visualLayout?: VisualLayout;
   } = $props();
   let code = '';
@@ -285,18 +289,13 @@
   class:canvas-presenting={canvas.presenting}
   ondblclick={handleDoubleClick}
   class={['relative h-full w-full', shouldShowGrid && `grid-bg-${mode.current}`]}>
-  <div
-    id="container"
-    bind:this={container}
-    class={[
-      'absolute inset-x-0 bottom-14 overflow-hidden',
-      canvas.presenting ? 'top-24' : 'top-44'
-    ]}>
-  </div>
-  {#if !rough && hasRenderedDiagram && canvas.graph.nodes.length}<CanvasTools
+  <div id="container" bind:this={container} class="absolute inset-0 overflow-hidden"></div>
+  {#if !rough && hasRenderedDiagram && (canvas.graph.nodes.length || toolbarStart || toolbarEnd)}<CanvasTools
       model={canvas}
       {editable}
-      {onComment} />{/if}
+      {onComment}
+      {toolbarStart}
+      {toolbarEnd} />{/if}
   {#if onSourceSelect && !rough && hasRenderedDiagram && !canvas.selected.length && !canvas.presenting}
     <div
       class="pointer-events-none absolute bottom-14 left-1/2 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-md border bg-background/90 px-2 py-1 text-center text-xs text-muted-foreground shadow-sm">

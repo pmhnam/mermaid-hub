@@ -99,7 +99,6 @@ test('resizes the editor and aligns the collapsed sidebar and preview toolbar', 
   const saved = await (await page.request.get(`/api/diagrams/${diagram.id}`, { headers })).json();
   expect(saved.currentContent).toBe(source);
   expect(saved.currentConfig).toBe('{}');
-  await page.getByRole('button', { name: 'Collapse workspace navigation' }).click();
   const sidebar = page.getByRole('complementary');
   await expect
     .poll(() => sidebar.evaluate((element) => element.getBoundingClientRect().width))
@@ -117,12 +116,23 @@ test('resizes the editor and aligns the collapsed sidebar and preview toolbar', 
     expect(box.x + box.width).toBeLessThanOrEqual(sidebarBox.x + sidebarBox.width);
   }
   const toolbar = page.getByTestId('preview-toolbar');
+  const hideCodeBox = await page.getByRole('button', { name: 'Hide code' }).boundingBox();
+  const findBox = await page.getByRole('button', { name: 'Find in diagram' }).boundingBox();
   const layoutBox = await toolbar.getByRole('button', { name: 'Choose layout' }).boundingBox();
   const zoomBox = await toolbar.getByRole('button', { name: 'Zoom options' }).boundingBox();
   const fullBox = await toolbar
     .getByRole('button', { name: 'Full screen', exact: true })
     .boundingBox();
-  if (!layoutBox || !zoomBox || !fullBox) throw new Error('Missing toolbar control');
+  if (!hideCodeBox || !findBox || !layoutBox || !zoomBox || !fullBox)
+    throw new Error('Missing toolbar control');
+  for (const box of [hideCodeBox, findBox]) {
+    expect(Math.abs(box.y + box.height / 2 - zoomBox.y - zoomBox.height / 2)).toBeLessThan(2);
+  }
+  const previewBounds = await page.getByRole('region', { name: 'Diagram preview' }).boundingBox();
+  const canvasBounds = await page.locator('#container').boundingBox();
+  if (!previewBounds || !canvasBounds) throw new Error('Missing preview canvas');
+  expect(Math.abs(canvasBounds.y - previewBounds.y)).toBeLessThan(1);
+  expect(Math.abs(canvasBounds.height - previewBounds.height)).toBeLessThan(1);
   expect(
     Math.abs(layoutBox.y + layoutBox.height / 2 - zoomBox.y - zoomBox.height / 2)
   ).toBeLessThan(1);

@@ -422,6 +422,39 @@
     </section>
   {/snippet}
 
+  {#snippet previewToolbarStart()}
+    {#if !isMobile}
+      <Button
+        class="h-10 shrink-0 border bg-background shadow-sm hover:bg-accent"
+        variant="ghost"
+        size="sm"
+        aria-expanded={editorOpen}
+        onclick={toggleEditor}><CodeIcon /> {editorOpen ? 'Hide code' : 'Edit code'}</Button>
+    {/if}
+  {/snippet}
+
+  {#snippet previewToolbarEnd()}
+    <div
+      class="flex max-w-full min-w-0 items-center gap-2 overflow-x-auto"
+      data-testid="preview-toolbar">
+      <LayoutToolbar
+        compact
+        code={currentContent}
+        config={currentConfig}
+        diagramType={validatedState.current.diagramType}
+        disabled={role === 'viewer'}
+        onChange={updateCollaborativeLayout} />
+      <PanZoomToolbar {panZoomState} compact />
+      <Button
+        class="size-10 border bg-background text-foreground shadow-sm hover:bg-accent"
+        variant="ghost"
+        size="icon"
+        title="Full screen"
+        aria-label="Full screen"
+        onclick={enterFullscreen}><FullscreenIcon /></Button>
+    </div>
+  {/snippet}
+
   {#snippet previewPanel()}
     <section
       bind:this={previewElement}
@@ -453,38 +486,15 @@
         shouldShowGrid={validatedState.current.grid}
         editable={role !== 'viewer'}
         onVisualLayoutChange={updateVisualLayout}
-        visualLayout={validatedState.current.visualLayout} />
+        visualLayout={validatedState.current.visualLayout}
+        toolbarStart={previewToolbarStart}
+        toolbarEnd={previewToolbarEnd} />
       {#if controller}
         <PreviewCursors
           container={previewElement}
           {controller}
           cursors={previewCursors}
           revision={previewRevision} />
-      {/if}
-      <div class="absolute top-3 right-3 flex items-center gap-2" data-testid="preview-toolbar">
-        <LayoutToolbar
-          compact
-          code={currentContent}
-          config={currentConfig}
-          diagramType={validatedState.current.diagramType}
-          disabled={role === 'viewer'}
-          onChange={updateCollaborativeLayout} />
-        <PanZoomToolbar {panZoomState} compact />
-        <Button
-          class="size-10 border bg-background text-foreground shadow-sm hover:bg-accent"
-          variant="ghost"
-          size="icon"
-          title="Full screen"
-          aria-label="Full screen"
-          onclick={enterFullscreen}><FullscreenIcon /></Button>
-      </div>
-      {#if !isMobile}
-        <Button
-          class="absolute top-3 left-3 h-10 border bg-background shadow-sm hover:bg-accent"
-          variant="ghost"
-          size="sm"
-          aria-expanded={editorOpen}
-          onclick={toggleEditor}><CodeIcon /> {editorOpen ? 'Hide code' : 'Edit code'}</Button>
       {/if}
     </section>
   {/snippet}
