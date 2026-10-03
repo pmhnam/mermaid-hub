@@ -3,7 +3,6 @@
   import Card from '$/components/Card/Card.svelte';
   import DiagramDocButton from '$/components/DiagramDocumentationButton.svelte';
   import Editor from '$/components/Editor.svelte';
-  import EnhancedEditsButton from '$/components/EnhancedEditsButton.svelte';
   import History from '$/components/History/History.svelte';
   import { startAutoSave } from '$/components/History/historyState.svelte';
   import Navbar from '$/components/Navbar.svelte';
@@ -215,7 +214,6 @@
             editable
             onVisualLayoutChange={updateVisualLayout}
             visualLayout={validatedState.current.visualLayout} />
-          <div class="absolute top-0 left-5 hidden md:block"><EnhancedEditsButton /></div>
           <div class="absolute top-0 right-0">
             <PanZoomToolbar {panZoomState} fullScreenHref={urls.current.view} />
           </div>
