@@ -288,7 +288,10 @@
   class:source-navigation={Boolean(onSourceSelect) && !rough}
   class:canvas-presenting={canvas.presenting}
   ondblclick={handleDoubleClick}
-  class={['relative h-full w-full', shouldShowGrid && `grid-bg-${mode.current}`]}>
+  class={[
+    'relative h-full w-full [container-type:inline-size]',
+    shouldShowGrid && `grid-bg-${mode.current}`
+  ]}>
   <div id="container" bind:this={container} class="absolute inset-0 overflow-hidden"></div>
   {#if !rough && hasRenderedDiagram && (canvas.graph.nodes.length || toolbarStart || toolbarEnd)}<CanvasTools
       model={canvas}

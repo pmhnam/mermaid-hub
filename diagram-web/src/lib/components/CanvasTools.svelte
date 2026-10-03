@@ -297,7 +297,9 @@
   data-canvas-tools
   class={[
     'absolute z-30 text-sm',
-    toolbarStart || toolbarEnd ? 'top-3 right-3 left-3' : 'top-14 left-3 max-w-[calc(100%-1.5rem)]'
+    toolbarStart || toolbarEnd
+      ? 'top-3 right-3 left-3'
+      : 'canvas-tools-top top-14 left-3 max-w-[calc(100%-1.5rem)]'
   ]}>
   <div class={toolbarStart || toolbarEnd ? 'flex flex-wrap items-center gap-2' : undefined}>
     {#if toolbarStart}{@render toolbarStart()}{/if}
@@ -617,6 +619,13 @@
 {/if}
 
 <style>
+  @container (min-width: 900px) {
+    .canvas-tools-top {
+      top: 0;
+      left: 0;
+      max-width: calc(100% - 21rem);
+    }
+  }
   .tool {
     border-radius: 0.25rem;
     padding: 0.35rem 0.5rem;
