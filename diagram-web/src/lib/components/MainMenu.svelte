@@ -5,6 +5,7 @@
   import { urls } from '$/util/state.svelte';
   import { cn } from '$/utils';
   import { resolve } from '$app/paths';
+  import { auth } from '$lib/product/auth.svelte';
   import { mode, setMode } from 'mode-watcher';
   import type { Component, Snippet } from 'svelte';
   import MermaidTailIcon from '~icons/custom/mermaid-tail';
@@ -66,9 +67,9 @@
     },
     {
       class: 'text-accent border-b-0',
-      href: resolve('/register', {}),
+      href: resolve('/login', {}),
       icon: MermaidChartIcon,
-      label: 'Workspace',
+      label: auth.current.status === 'authenticated' ? 'My workspace' : 'Sign in to workspace',
       renderer: menuItem
     }
   ]);

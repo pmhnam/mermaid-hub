@@ -12,6 +12,7 @@
   import MainMenu from '$/components/MainMenu.svelte';
   import { Button } from '$/components/ui/button';
   import { Separator } from '$/components/ui/separator';
+  import AccountMenu from '$lib/product/AccountMenu.svelte';
   import { dismissPromotion, getActivePromotion } from '$lib/util/promos/promo.svelte';
   import { untrack, type ComponentProps, type Snippet } from 'svelte';
   import MermaidIcon from '~icons/custom/mermaid';
@@ -97,6 +98,9 @@
     <DropdownNavMenu icon={GithubIcon} links={githubLinks} />
     <Separator orientation="vertical" />
     {@render children()}
+  </div>
+  <div class="ml-2 flex shrink-0 items-center">
+    <AccountMenu />
   </div>
   {@render mobileActions?.()}
   {@render mobileToggle?.()}
