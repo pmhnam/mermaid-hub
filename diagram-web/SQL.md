@@ -22,6 +22,10 @@ Supported structures include:
 
 Unsupported statements/options are reported in conversion notes. This is a table-schema importer, not a complete migration interpreter: destructive migrations, views, inheritance/partition semantics, expression indexes, triggers and stored procedures are not reconstructed. MySQL version-conditional DDL comments are not imported. Use plain `CREATE TABLE` DDL for those objects.
 
+### Grouping by database / schema
+
+Imported tables keep their qualifier as `schema.table` (PostgreSQL schema, MySQL database). To see which tables live where, open **AI Arrange → Group by DB / schema** on the canvas, review the preview and choose **Apply arrangement**. Each namespace becomes a labelled box; unqualified tables stay unclassified. The button fills the **Database** column from the text before the last dot of the table name, so hand-authored names such as `orders_db.public.orders` work too. Service names and any value you edit afterwards are kept, and no AI or sign-in is needed.
+
 ## Export
 
 Open **Export → SQL**, select the target database and review **SQL preview** and conversion notes. Choose **Copy SQL** or **Download SQL**. In the Live Editor, **Ctrl/Cmd + K → Export diagram** opens this dialog too.

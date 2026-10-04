@@ -1,3 +1,4 @@
+import { UNCLASSIFIED } from './arrangement';
 import { elementBounds, unionBounds } from './canvasGraph';
 import { visualNodeElements, visualNodeKey, type VisualLayout } from './layout';
 
@@ -11,7 +12,10 @@ export const drawArrangeGroups = (svg: SVGSVGElement, layout: VisualLayout): voi
   for (const assignment of layout.arrangement.assignments) {
     const key = JSON.stringify([assignment.service, assignment.database]);
     const group = groups.get(key) ?? {
-      label: `${assignment.service} / ${assignment.database}`,
+      label:
+        assignment.service === UNCLASSIFIED && assignment.database !== UNCLASSIFIED
+          ? assignment.database
+          : `${assignment.service} / ${assignment.database}`,
       ids: []
     };
     group.ids.push(assignment.tableId);

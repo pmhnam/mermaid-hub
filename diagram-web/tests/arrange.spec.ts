@@ -59,6 +59,28 @@ test('previews, cancels, applies and restores grouped ER layout without changing
   );
 });
 
+test('groups tables by the DB/schema in their qualified names', async ({ page }) => {
+  await page.goto(url);
+  const svg = page.locator('#container svg.erDiagram');
+  await expect(svg).toBeVisible();
+  await page.getByRole('button', { name: 'AI Arrange', exact: true }).click();
+  await page.getByRole('button', { name: 'Group by DB / schema', exact: true }).click();
+  await expect(page.getByLabel('Database for billing.users', { exact: true })).toHaveValue(
+    'billing'
+  );
+  await expect(page.getByLabel('Database for identity.users', { exact: true })).toHaveValue(
+    'identity'
+  );
+  await expect(page.getByLabel('Database for AUDIT', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('img', { name: 'Proposed table positions' })).toBeVisible();
+  await page.getByRole('button', { name: 'Apply arrangement', exact: true }).click();
+  await expect(svg.locator('[data-arrange-groups] text')).toHaveText([
+    'billing',
+    'identity',
+    'Unclassified / Unclassified'
+  ]);
+});
+
 test('rejects a stale preview after another layout change', async ({ page }) => {
   await page.goto(url);
   await page.getByRole('button', { name: 'AI Arrange', exact: true }).click();

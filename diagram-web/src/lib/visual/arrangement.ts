@@ -14,6 +14,14 @@ export interface ArrangeGraph {
   edges: { source: string; target: string }[];
 }
 
+export const UNCLASSIFIED = 'Unclassified';
+
+/** Qualified IDs (`schema.table`, `db.schema.table`) name their own DB/schema: everything before the last dot. */
+export const tableNamespace = (tableId: string): string => {
+  const index = tableId.lastIndexOf('.');
+  return index > 0 ? tableId.slice(0, index).trim().slice(0, 120) : '';
+};
+
 export const parseArrangement = (value: unknown): Arrangement | undefined => {
   if (!value || typeof value !== 'object') return;
   const candidate = value as Partial<Arrangement>;

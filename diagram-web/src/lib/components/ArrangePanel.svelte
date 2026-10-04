@@ -7,6 +7,8 @@
   import { arrangeLayout, type ArrangePreview } from '$/visual/arrangeLayout';
   import {
     completeAssignments,
+    tableNamespace,
+    UNCLASSIFIED,
     type ArrangeGraph,
     type TableAssignment
   } from '$/visual/arrangement';
@@ -22,6 +24,7 @@
   let busy = $state(true);
   let error = $state('');
   let preview = $state.raw<ArrangePreview>();
+  const namespaced = $derived(assignments.some((item) => tableNamespace(item.tableId)));
   let previewInput = '';
   let baseline = '';
   let disposed = false;
@@ -103,8 +106,8 @@
       }));
       const normalized = assignments.map((item) => ({
         ...item,
-        service: item.service.trim() || 'Unclassified',
-        database: item.database.trim() || 'Unclassified'
+        service: item.service.trim() || UNCLASSIFIED,
+        database: item.database.trim() || UNCLASSIFIED
       }));
       const result = await arrangeLayout(
         graph,
@@ -123,6 +126,14 @@
     } finally {
       busy = false;
     }
+  };
+
+  const groupBySchema = async () => {
+    assignments = assignments.map((item) => ({
+      ...item,
+      database: tableNamespace(item.tableId) || item.database
+    }));
+    await buildPreview();
   };
 
   const apply = async () => {
@@ -159,7 +170,8 @@
   </div>
   <p class="text-xs text-muted-foreground">
     Assign service and database ownership, then preview. Blank ownership stays unclassified.
-    Existing assignments are preserved by AI.
+    Existing assignments are preserved by AI. Tables named <code>schema.table</code> can be grouped by
+    their DB/schema directly.
   </p>
   <fieldset disabled={busy} class="space-y-3">
     <label class="block text-xs"
@@ -172,6 +184,9 @@
       class="rounded border px-3 py-1"
       disabled={!graph || auth.current.status !== 'authenticated'}
       onclick={suggest}>Suggest groups with AI</button>
+    {#if namespaced}<button class="rounded border px-3 py-1" onclick={groupBySchema}
+        >Group by DB / schema</button
+      >{/if}
     {#if auth.current.status !== 'authenticated'}<p class="text-xs text-muted-foreground">
         Sign in to use AI suggestions. Manual grouping works without AI.
       </p>{/if}

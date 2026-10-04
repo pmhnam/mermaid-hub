@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { arrangeLayout } from './arrangeLayout';
-import { completeAssignments } from './arrangement';
+import { completeAssignments, tableNamespace } from './arrangement';
 import { parseVisualLayout } from './layout';
 
 describe('grouped ER layout', () => {
@@ -60,6 +60,14 @@ describe('grouped ER layout', () => {
     },
     15000
   );
+
+  it('derives the DB/schema group from qualified table IDs', () => {
+    expect(tableNamespace('billing.users')).toBe('billing');
+    expect(tableNamespace('orders_db.public.orders')).toBe('orders_db.public');
+    expect(tableNamespace('AUDIT')).toBe('');
+    expect(tableNamespace('.hidden')).toBe('');
+    expect(tableNamespace(`${'a'.repeat(200)}.users`)).toHaveLength(120);
+  });
 
   it('rejects unknown assignments and preserves special IDs safely', () => {
     const item = { tableId: '__proto__', service: 'service', database: 'db' };
